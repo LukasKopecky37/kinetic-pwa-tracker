@@ -1,0 +1,28 @@
+# macOS noise
+.DS_Store
+**/.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups y versiones antiguas
+*.backup
+*.bak
+rutina.v*.backup
+
+# Vercel deploy cache local
+.vercel/
+
+# Node (por si en algún momento se añade)
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Datos personales que no deben subirse a un repo público
+*.csv
+*.numbers
+*.rtf

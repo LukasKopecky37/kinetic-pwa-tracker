@@ -1,0 +1,393 @@
+/* ============================================================================
+   FASE I — Vista de entrenamiento activo (el "player" a pantalla completa).
+   Estilo iOS premium: oscuro, glass, acento naranja, tap targets grandes.
+   ============================================================================ */
+
+/* Mientras el player está abierto: bloquea el scroll del shell y oculta el
+   panel flotante de descanso (el player tiene su propio timer grande). */
+body.aw-open { overflow: hidden; }
+body.aw-open .rest-panel { display: none !important; }
+
+.aw-overlay {
+  position: fixed; inset: 0; z-index: 55;
+  background: var(--bg);
+  display: none; flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.aw-overlay.show {
+  display: flex;
+  animation: awIn 300ms cubic-bezier(.2,.8,.2,1);
+}
+@keyframes awIn {
+  from { opacity: 0; transform: translateY(3%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----- Cabecera ----- */
+.aw-top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px 10px;
+}
+.aw-min {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  width: 38px; height: 38px; border-radius: 12px; font-size: 20px;
+  cursor: pointer; flex-shrink: 0; line-height: 1;
+}
+.aw-min:active { transform: scale(.92); }
+.aw-top-mid { flex: 1; min-width: 0; text-align: center; }
+.aw-elapsed {
+  font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums;
+  letter-spacing: .5px;
+}
+.aw-routine {
+  font-size: 11px; color: var(--muted); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aw-top-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.aw-cancel {
+  background: transparent; border: 0; color: var(--muted);
+  font-size: 12px; cursor: pointer; padding: 8px 6px; font-weight: 600;
+}
+.aw-cancel:active { color: var(--bad); }
+.aw-finish {
+  background: var(--accent); color: #1a0a00; border: 0;
+  border-radius: 10px; padding: 9px 14px; font-size: 13px;
+  font-weight: 700; cursor: pointer; letter-spacing: .3px;
+}
+.aw-finish:active { transform: scale(.96); }
+
+/* ----- Progreso (pos · dots · contador) ----- */
+.aw-progress {
+  display: flex; align-items: center; gap: 10px;
+  padding: 2px 16px 12px;
+}
+.aw-pos-chip {
+  background: var(--accent-bg); color: var(--accent-2);
+  border: 1px solid var(--accent); border-radius: 8px;
+  padding: 4px 8px; font-size: 12px; font-weight: 700;
+  min-width: 34px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.aw-dots {
+  flex: 1; display: flex; gap: 6px; align-items: center;
+  overflow-x: auto; scrollbar-width: none;
+}
+.aw-dots::-webkit-scrollbar { display: none; }
+.aw-dot {
+  flex: 1; min-width: 14px; height: 6px; border-radius: 3px;
+  background: var(--line); border: 0; padding: 0; cursor: pointer;
+  transition: background .2s, transform .12s;
+}
+.aw-dot.done { background: var(--good); }
+.aw-dot.cur  { background: var(--accent); transform: scaleY(1.6); }
+.aw-dot.cur.done { background: var(--accent); }
+.aw-counter {
+  font-size: 11px; color: var(--muted); flex-shrink: 0;
+  font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
+}
+
+/* ----- Carrusel ----- */
+.aw-stage { flex: 1; overflow: hidden; position: relative; }
+.aw-track {
+  display: flex; height: 100%;
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1);
+  will-change: transform;
+}
+.aw-page {
+  flex: 0 0 100%; height: 100%; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 16px 24px;
+}
+
+/* ----- Cabecera del ejercicio ----- */
+.aw-ex-head {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 6px 0 16px;
+}
+.aw-ex-titles { flex: 1; min-width: 0; }
+.aw-ex-name { font-size: 22px; font-weight: 800; line-height: 1.15; }
+.aw-ex-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.aw-ex-last { text-align: right; flex-shrink: 0; font-size: 12px; }
+.aw-last-cap {
+  display: block; font-size: 9px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 2px;
+}
+.aw-ex-last b { color: var(--text); font-weight: 700; font-size: 13px; }
+
+/* ----- Series (Módulo 2: fila limpia + check circular) ----- */
+.aw-sets { display: flex; flex-direction: column; gap: 8px; }
+
+/* Cabecera de columnas: una sola vez, alineada con la grid de la fila.
+   (Adiós a los labels flotantes que se superponían entre filas.) */
+.aw-set-head,
+.aw-set {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 56px 50px 22px;
+  gap: 8px; align-items: center;
+}
+.aw-set-head { padding: 0 10px 2px; }
+.aw-set-head span {
+  font-size: 10px; color: var(--muted); text-align: center;
+  text-transform: uppercase; letter-spacing: .8px;
+}
+.aw-set {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 12px 10px;
+  transition: border-color .15s, background .15s;
+}
+.aw-set.next { border-color: var(--accent); }
+.aw-set.is-completed {
+  background: var(--good-bg); border-color: var(--good-border);
+}
+.aw-set-n {
+  text-align: center; font-weight: 800; font-size: 14px;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.aw-set.is-completed .aw-set-n { color: var(--good); }
+
+/* Inputs sin borde "ruidoso": el borde aparece solo al enfocar */
+.aw-in {
+  width: 100%; background: var(--neutral-bg); border: 1px solid transparent;
+  border-radius: 8px; color: var(--text); padding: 12px 4px;
+  text-align: center; font-weight: 700; font-size: 17px;
+  font-variant-numeric: tabular-nums; -webkit-appearance: none;
+}
+.aw-in:focus { outline: none; border-color: var(--accent); background: var(--panel-2); }
+.aw-in.aw-rpe { font-size: 14px; }
+.aw-in:disabled { opacity: .55; }
+/* Serie completada: inputs bloqueados temporalmente */
+.aw-set.is-completed .aw-in { opacity: .6; pointer-events: none; }
+
+/* Stepper de reps: [- N +] sin teclado nativo. Encaja en la columna 1fr. */
+.aw-stepper {
+  display: grid; grid-template-columns: 34px 1fr 34px;
+  gap: 4px; align-items: stretch;
+  background: var(--neutral-bg); border: 1px solid transparent;
+  border-radius: 8px; padding: 2px;
+}
+.aw-set.next .aw-stepper { border-color: var(--accent); }
+.aw-stepper .aw-step {
+  background: transparent; border: 0; color: var(--accent-2);
+  font-size: 20px; font-weight: 800; line-height: 1; cursor: pointer;
+  border-radius: 6px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-variant-numeric: tabular-nums;
+  transition: background .12s, transform .1s;
+}
+.aw-stepper .aw-step:active { transform: scale(.9); background: rgba(255,122,47,.18); }
+.aw-stepper .aw-step:disabled { opacity: .4; cursor: not-allowed; }
+.aw-stepper .aw-step-val {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; user-select: none;
+}
+.aw-set.is-completed .aw-stepper { opacity: .65; }
+.aw-set.is-completed .aw-stepper .aw-step-val { color: var(--good); }
+
+/* Aviso sub-rango: borde naranja sutil cuando reps < límite inferior */
+.aw-set.is-under{
+  border-color: rgba(255,122,47,.55);
+  box-shadow: inset 0 0 0 1px rgba(255,122,47,.10);
+}
+.aw-set.is-under .aw-stepper{ background: rgba(255,122,47,.06); }
+.aw-set.is-under .aw-step-val{ color: var(--accent-2); }
+/* Si además está completa (verde), prevalece el verde para no marearse */
+.aw-set.is-completed.is-under{ border-color: var(--good-border); }
+.aw-set.is-completed.is-under .aw-stepper{ background: transparent; }
+.aw-set.is-completed.is-under .aw-step-val{ color: var(--good); }
+
+/* Botón de acción circular (Set completado) */
+.aw-check {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: transparent; border: 2px solid var(--line);
+  color: transparent; font-size: 20px; font-weight: 900;
+  cursor: pointer; justify-self: center;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s cubic-bezier(.2,.8,.2,1),
+              background .18s, border-color .18s, color .12s;
+}
+.aw-check:active { transform: scale(.88); }
+.aw-set.next .aw-check { border-color: var(--accent); }
+.aw-set.is-completed .aw-check {
+  background: var(--good); border-color: var(--good); color: #04210f;
+  animation: awCheckPop .3s cubic-bezier(.2,.8,.2,1.4);
+}
+@keyframes awCheckPop {
+  0%   { transform: scale(.6); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.aw-set-del {
+  background: transparent; border: 0; color: var(--muted);
+  font-size: 16px; width: 22px; height: 38px; cursor: pointer;
+  border-radius: 6px; opacity: .5;
+}
+.aw-set-del:active { background: var(--bad-bg); color: var(--bad); }
+.aw-set.is-completed .aw-set-del { visibility: hidden; }
+
+.aw-add {
+  width: 100%; margin-top: 12px;
+  background: transparent; color: var(--accent-2);
+  border: 1px dashed var(--accent); border-radius: var(--radius-sm);
+  padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer;
+  letter-spacing: .3px;
+}
+.aw-add:active { transform: scale(.99); }
+
+.aw-notes-wrap { margin-top: 14px; }
+.aw-notes {
+  width: 100%; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px; font-size: 14px; -webkit-appearance: none;
+}
+.aw-notes:focus { outline: none; border-color: var(--accent); }
+
+.aw-empty {
+  text-align: center; color: var(--muted); padding: 60px 20px; font-size: 15px;
+}
+
+/* ----- Timer grande de descanso ----- */
+.aw-rest {
+  display: flex; align-items: center; gap: 16px;
+  margin: 0 14px 12px; padding: 14px 16px;
+  background: linear-gradient(135deg, #171a21, #1e222b);
+  border: 1px solid var(--accent); border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  animation: awRestIn 240ms cubic-bezier(.2,.8,.2,1);
+}
+.aw-rest[hidden] { display: none; }
+@keyframes awRestIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.aw-rest-ring {
+  width: 76px; height: 76px; border-radius: 50%; flex-shrink: 0;
+  position: relative;
+  background: conic-gradient(var(--accent) 0deg, var(--line) 0);
+}
+.aw-rest-ring::before {
+  content: ""; position: absolute; inset: 7px;
+  background: #15181f; border-radius: 50%;
+}
+.aw-rest-time {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;
+  z-index: 1;
+}
+.aw-rest-mid { flex: 1; min-width: 0; }
+.aw-rest-name {
+  font-size: 13px; font-weight: 700; color: var(--accent-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+.aw-rest-actions { display: flex; gap: 6px; }
+.aw-rest-actions button {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 8px 12px; font-size: 13px;
+  font-weight: 700; cursor: pointer;
+}
+.aw-rest-actions button:active { transform: scale(.94); }
+.aw-rest-actions .skip {
+  background: var(--accent-bg); border-color: var(--accent); color: var(--accent-2);
+}
+
+/* ----- Pie (anterior · preview siguiente / terminar) ----- */
+.aw-foot {
+  display: flex; align-items: stretch; gap: 10px;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+}
+.aw-prev {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  width: 52px; border-radius: 12px; font-size: 22px; cursor: pointer;
+  flex-shrink: 0; line-height: 1;
+}
+.aw-prev:active { transform: scale(.94); }
+.aw-next {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  gap: 8px; background: var(--panel-2); border: 1px solid var(--line);
+  color: var(--text); border-radius: 12px; padding: 12px 16px;
+  cursor: pointer; min-width: 0;
+}
+.aw-next:active { transform: scale(.99); }
+.aw-next.finish {
+  background: var(--accent); border-color: transparent; color: #1a0a00;
+}
+.aw-next-cap {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px; flex-shrink: 0;
+}
+.aw-next-name {
+  font-size: 15px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aw-next.finish .aw-next-name { letter-spacing: .3px; }
+.aw-next-arrow { font-size: 18px; color: var(--muted); flex-shrink: 0; }
+
+/* ----- Módulo 4: botón "Cambiar ej." + hoja contextual ----- */
+.aw-change {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--accent-2);
+  border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 700;
+  cursor: pointer; flex-shrink: 0; white-space: nowrap; line-height: 1;
+}
+.aw-change:active { transform: scale(.96); }
+
+/* La hoja vive DENTRO de #activeWorkout (no usa .modal-bg global porque el
+   overlay del player va por encima de z-index del modal). */
+.aw-sheet-bg {
+  position: absolute; inset: 0; z-index: 5;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: awFadeIn .18s ease;
+}
+@keyframes awFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.aw-sheet {
+  width: 100%; max-width: 540px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-top-left-radius: 18px; border-top-right-radius: 18px;
+  max-height: 82%; display: flex; flex-direction: column; overflow: hidden;
+  animation: awSheetUp .26s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes awSheetUp {
+  from { transform: translateY(100%); } to { transform: translateY(0); }
+}
+.aw-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+}
+.aw-sheet-head h3 { margin: 0; font-size: 16px; }
+.aw-sheet-x {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer;
+}
+.aw-sheet-body {
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.aw-sheet-cap {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px; margin: 12px 2px 8px;
+}
+.aw-sheet-cap:first-child { margin-top: 0; }
+.aw-sheet-jump { display: flex; flex-direction: column; gap: 6px; }
+.aw-sheet-list { display: flex; flex-direction: column; gap: 6px; }
+.aw-sheet-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 12px 14px; cursor: pointer;
+}
+.aw-sheet-row:active { transform: scale(.99); }
+.aw-sheet-row:hover { border-color: var(--accent); }
+.aw-sheet-row-name { font-size: 14px; font-weight: 600; min-width: 0; }
+.aw-sheet-row-tag { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.aw-sheet-search {
+  width: 100%; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 11px 12px; font-size: 14px; margin-bottom: 8px; -webkit-appearance: none;
+}
+.aw-sheet-search:focus { outline: none; border-color: var(--accent); }
+.aw-sheet-empty {
+  text-align: center; color: var(--muted); font-size: 13px; padding: 16px;
+}

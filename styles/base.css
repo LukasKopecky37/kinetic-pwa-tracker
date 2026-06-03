@@ -1,0 +1,52 @@
+/* ============================================================================
+   Base — reset mínimo, body, header, brand, botones-icono.
+   ============================================================================ */
+*{box-sizing:border-box}
+html,body{
+  margin:0; padding:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+body{ padding-bottom:90px; min-height:100vh; }
+button{ font-family:inherit; }
+input,select,textarea{ font-family:inherit; font-size:16px; }
+
+header{
+  position:sticky; top:0; z-index:10;
+  background:rgba(15,17,21,.92);
+  backdrop-filter:saturate(140%) blur(10px);
+  border-bottom:1px solid var(--line);
+  /* Safe-area: respeta el notch / Dynamic Island; el OS reserva ~50px arriba */
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+}
+.brand{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  min-height:44px;  /* asegura una zona de tap cómoda al engranaje */
+}
+.brand-left{ display:flex; flex-direction:column; min-width:0; flex:1; }
+h1{
+  margin:0; font-size:18px; font-weight:700; letter-spacing:.2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.meso-pill{
+  font-size:11px; color:var(--accent-2); margin-top:2px;
+  cursor:pointer; letter-spacing:.3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.h-actions{ display:flex; gap:8px; flex-shrink:0; align-items:center; }
+/* Tap target mínimo recomendado por iOS HIG: 44×44 */
+.icon-btn{
+  background:var(--panel); border:1px solid var(--line); color:var(--text);
+  min-width:44px; height:44px; border-radius:12px;
+  font-size:16px; cursor:pointer; padding:0 10px;
+  display:inline-flex; align-items:center; justify-content:center;
+  white-space:nowrap;
+}
+.icon-btn:active{ transform:scale(.95); }
+/* La píldora de "hoy" lleva texto ("02 jun") → necesita ancho auto, no se
+   parte en dos líneas. */
+.icon-btn#todayPill{
+  font-size:12px; font-weight:600; line-height:1.1;
+  letter-spacing:.2px;
+}

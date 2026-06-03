@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rutina">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon.svg">
+<title>Rutina — Tracker</title>
+
+<link rel="stylesheet" href="./styles/tokens.css">
+<link rel="stylesheet" href="./styles/base.css">
+<link rel="stylesheet" href="./styles/layout.css">
+<link rel="stylesheet" href="./styles/components.css">
+<link rel="stylesheet" href="./styles/views.css">
+<link rel="stylesheet" href="./styles/animations.css">
+<link rel="stylesheet" href="./styles/active.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="brand-left">
+      <h1 id="appTitle">Rutina</h1>
+      <span class="meso-pill" id="mesoPill">— tu rutina</span>
+    </div>
+    <div class="h-actions">
+      <button class="icon-btn" id="todayPill">·</button>
+      <button class="icon-btn" id="btnSettings" aria-label="Ajustes">⚙</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- RUTINA (Home + vista de rutina activa) -->
+  <section id="tab-inicio" class="tab active">
+    <div id="view-home" class="subview active">
+      <div class="home-title"><span>Tus rutinas</span><a id="quickEdit">gestionar</a></div>
+      <div id="streakBanner"></div>
+      <div class="home-grid" id="routineGrid"></div>
+    </div>
+    <div id="view-routine" class="subview">
+      <div class="route-head">
+        <button class="route-back" id="btnBack" aria-label="Volver">‹</button>
+        <div class="route-title">
+          <h2 id="routeName">—</h2>
+          <div class="r-sub" id="routeSub">—</div>
+        </div>
+        <input type="date" id="dateInput" class="date-input">
+      </div>
+      <div id="muscleMap"></div>
+      <div id="exerciseList"></div>
+    </div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section id="tab-historial" class="tab">
+    <div class="hist-filter">
+      <select id="filterGroup"><option value="">Todos los grupos</option></select>
+    </div>
+
+    <div class="hist-tabs" role="tablist">
+      <button class="ht-tab on" type="button" data-pane="bit" role="tab" aria-selected="true">Bitácora</button>
+      <button class="ht-tab" type="button" data-pane="chip" role="tab" aria-selected="false">Por ejercicio</button>
+    </div>
+
+    <div class="hist-pane" id="histPaneBit" role="tabpanel">
+      <div id="bitacora"></div>
+    </div>
+    <div class="hist-pane hidden" id="histPaneChip" role="tabpanel">
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <!-- PROGRESO -->
+  <section id="tab-progreso" class="tab">
+    <div class="hist-filter">
+      <select id="progressExercise"></select>
+    </div>
+    <div class="stats" id="progressStats"></div>
+    <div class="chart-card">
+      <div class="chart-title">Progreso de fuerza <small>peso máximo · top set</small></div>
+      <div class="chart-canvas-wrap"><canvas id="chartCanvas" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Volumen total <small>Σ(peso × reps) por sesión</small></div>
+      <div class="chart-canvas-wrap"><canvas id="volumeCanvas" height="200"></canvas></div>
+    </div>
+    <div id="suggestionBox"></div>
+  </section>
+
+  <!-- ANÁLISIS -->
+  <section id="tab-analisis" class="tab">
+    <div class="an-bento" id="anBento"></div>
+
+    <h4 class="an-h4">Volumen semanal por grupo</h4>
+    <div id="volChart"><canvas id="volCanvas" height="220"></canvas></div>
+
+    <div class="mh-card">
+      <div class="mh-title">Mapa de calor muscular <small>carga · últimos 30 días</small></div>
+      <div class="mh-body">
+        <div class="mh-svg" id="muscleHeatmap"></div>
+        <div class="mh-side">
+          <div class="mh-legend"><span>bajo</span><i class="mh-bar"></i><span>alto</span></div>
+          <ol class="mh-top" id="muscleHeatTop"></ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="heatmap">
+      <div class="hm-title">Frecuencia de entrenamiento <small>últimas 12 semanas</small></div>
+      <div class="hm-body">
+        <div class="hm-months" id="hmMonths"></div>
+        <div class="hm-row">
+          <div class="hm-days">
+            <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+          </div>
+          <div class="hm-grid" id="hmGrid"></div>
+        </div>
+      </div>
+      <div class="hm-legend">
+        <span>menos</span>
+        <i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i>
+        <span>más</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- REST PANEL -->
+<div class="rest-panel" id="restPanel">
+  <div class="rp-ring">
+    <svg viewBox="0 0 64 64">
+      <circle class="rp-bg" cx="32" cy="32" r="27"/>
+      <circle class="rp-fg" cx="32" cy="32" r="27" stroke-dasharray="169.6" stroke-dashoffset="0" id="rpFg"/>
+    </svg>
+    <div class="rp-time" id="rpTime">2:00</div>
+  </div>
+  <div class="rp-info">
+    <div class="rp-name" id="rpName">Descanso</div>
+    <div class="rp-sub" id="rpSub">—</div>
+  </div>
+  <div class="rp-actions">
+    <button id="rpMinus" title="-15s">−15</button>
+    <button id="rpPlus"  title="+15s">+15</button>
+    <button class="close" id="rpStop" title="Detener">×</button>
+  </div>
+</div>
+
+<!-- ENTRENAMIENTO ACTIVO (player a pantalla completa, Fase I) -->
+<div class="aw-overlay" id="activeWorkout" aria-hidden="true"></div>
+
+<nav class="tabs">
+  <button data-tab="inicio" class="active"><span class="ico">⌂</span><span>Rutina</span></button>
+  <button data-tab="historial"><span class="ico">≡</span><span>Historial</span></button>
+  <button data-tab="progreso"><span class="ico">↗</span><span>Progreso</span></button>
+  <button data-tab="analisis"><span class="ico">◫</span><span>Análisis</span></button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- Globals: Chart.js + Dexie (IndexedDB). Cargan antes que main.js para
+     que estén disponibles cuando importemos módulos que los usan. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.7/dist/dexie.min.js"></script>
+<!-- Entry point modular -->
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

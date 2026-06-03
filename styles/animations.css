@@ -1,0 +1,91 @@
+/* ============================================================================
+   FASE G — Animaciones y microinteracciones
+   ============================================================================
+   Reglas:
+   - Duración corta (180–280ms). Lo que sube de 320ms ya se nota lento.
+   - Curva spring suave: cubic-bezier(.2,.8,.2,1).
+   - Animar solo transform y opacity (cheap; usan compositor).
+   - Respetar `prefers-reduced-motion`.
+   ============================================================================ */
+
+/* ----- Cambio de subvista Home ↔ Routine -----
+   Cuidado con la especificidad: si usamos `#view-home { display:none }`
+   ese selector (0,1,0,0) gana sobre `.subview.active` (0,0,2,0). Por eso
+   los overrides también van con ID. */
+.subview { display: none; }
+.subview.active { display: block; }
+.subview.active { animation: subviewIn 280ms cubic-bezier(.2,.8,.2,1); }
+@keyframes subviewIn {
+  from { opacity: 0; transform: translateX(8%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+/* Sentido contrario cuando volvemos atrás (a Home) */
+.subview.active.from-back { animation: subviewBack 240ms cubic-bezier(.2,.8,.2,1); }
+@keyframes subviewBack {
+  from { opacity: 0; transform: translateX(-6%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ----- Cambio entre pestañas (fade-up sutil) ----- */
+.tab.tab-fade-in { animation: tabFadeIn 220ms cubic-bezier(.2,.8,.2,1); }
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----- Toast con pequeño bounce ----- */
+.toast{
+  transition:
+    opacity   .22s cubic-bezier(.2,.8,.2,1),
+    transform .22s cubic-bezier(.2,.8,.2,1.2);
+}
+.toast:not(.show){
+  transform: translateX(-50%) translateY(8px) scale(.96);
+}
+.toast.show{
+  transform: translateX(-50%) translateY(-4px) scale(1);
+}
+
+/* ----- Streak banner ----- */
+.streak-banner{
+  display:flex; align-items:center; gap:10px;
+  background:linear-gradient(135deg, rgba(255,122,47,.16), rgba(255,184,107,.06));
+  border:1px solid var(--accent);
+  border-radius:var(--radius);
+  padding:11px 14px; margin-bottom:14px;
+  cursor:pointer;
+  animation: streakIn 380ms cubic-bezier(.2,.8,.2,1);
+}
+.streak-banner:active{ transform: scale(.99); }
+.streak-banner .sb-icon{
+  font-size:18px; line-height:1; flex-shrink:0;
+  animation: streakBounce 1.6s ease-in-out infinite;
+}
+.streak-banner .sb-text{
+  font-size:13px; font-weight:600; flex:1; min-width:0;
+}
+.streak-banner .sb-text b{ color:var(--accent-2); }
+.streak-banner .sb-arrow{ color:var(--muted); font-size:18px; }
+
+@keyframes streakIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes streakBounce {
+  0%,100% { transform: translateY(0) scale(1); }
+  50%     { transform: translateY(-2px) scale(1.08); }
+}
+
+/* ----- Botones primarios: scale-down al pulsar ya estaba, refinamos curva ----- */
+.btn, .icon-btn, .rest-btn, .route-btn, .day-chip, .chip, .menu-row, .stat {
+  transition: transform 120ms cubic-bezier(.2,.8,.2,1);
+}
+
+/* ----- prefers-reduced-motion: respetar al usuario ----- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

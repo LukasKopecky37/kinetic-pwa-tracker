@@ -1,0 +1,34 @@
+/* ============================================================================
+   Design tokens — fuente única de variables visuales.
+   Cualquier color/medida nueva entra aquí y se reutiliza vía var(--x).
+   ============================================================================ */
+:root{
+  --bg:#0f1115;
+  --panel:#171a21;
+  --panel-2:#1e222b;
+  --line:#2a2f3a;
+  --text:#e9edf3;
+  --muted:#8a93a3;
+
+  --accent:#ff7a2f;
+  --accent-2:#ffb86b;
+  --accent-bg:rgba(255,122,47,.18);
+
+  --good:#22c55e;
+  --good-bg:rgba(34,197,94,.16);
+  --good-border:rgba(34,197,94,.35);
+
+  --bad:#ef4444;
+  --bad-bg:rgba(239,68,68,.14);
+  --bad-border:rgba(239,68,68,.35);
+
+  --warn:#fbbf24;
+  --warn-bg:rgba(251,191,36,.16);
+
+  --neutral-bg:#22262f;
+
+  --radius:14px;
+  --radius-sm:10px;
+
+  font-synthesis:none;
+}

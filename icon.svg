@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo redondeado oscuro -->
+  <rect width="512" height="512" rx="96" fill="#0f1115"/>
+  <!-- Mancuerna estilizada en naranja -->
+  <g stroke="#ff7a2f" stroke-width="36" stroke-linecap="round" fill="none">
+    <line x1="120" y1="256" x2="392" y2="256"/>
+  </g>
+  <g fill="#ff7a2f">
+    <rect x="78"  y="172" width="46" height="168" rx="14"/>
+    <rect x="388" y="172" width="46" height="168" rx="14"/>
+    <rect x="40"  y="208" width="38" height="96"  rx="10"/>
+    <rect x="434" y="208" width="38" height="96"  rx="10"/>
+  </g>
+  <!-- Punto naranja claro central -->
+  <circle cx="256" cy="256" r="20" fill="#ffb86b"/>
+</svg>

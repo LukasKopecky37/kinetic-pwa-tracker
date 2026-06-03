@@ -1,0 +1,24 @@
+/* ============================================================================
+   Layout — main, sistema de tabs, bottom nav.
+   ============================================================================ */
+main{ padding:14px 14px 24px; max-width:920px; margin:0 auto; }
+.tab{ display:none; }
+.tab.active{ display:block; }
+
+/* Bottom navigation */
+.tabs{
+  position:fixed; bottom:0; left:0; right:0; z-index:20;
+  background:rgba(15,17,21,.95);
+  backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+  display:flex; justify-content:space-around;
+  padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+}
+.tabs button{
+  flex:1; background:none; border:0; color:var(--muted);
+  font-size:11px; padding:6px 4px;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  border-radius:10px; cursor:pointer;
+}
+.tabs button .ico{ font-size:18px; line-height:1; font-weight:700; }
+.tabs button.active{ color:var(--accent); }

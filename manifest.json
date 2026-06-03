@@ -1,0 +1,19 @@
+{
+  "name": "Rutina",
+  "short_name": "Rutina",
+  "description": "Tracker de entrenamiento de fuerza con insights y modo workout activo.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#ff7a2f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
