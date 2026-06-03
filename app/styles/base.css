@@ -16,9 +16,25 @@ header{
   position:sticky; top:0; z-index:10;
   background:rgba(15,17,21,.92);
   backdrop-filter:saturate(140%) blur(10px);
+  -webkit-backdrop-filter:saturate(140%) blur(10px);
   border-bottom:1px solid var(--line);
-  /* Safe-area: respeta el notch / Dynamic Island; el OS reserva ~50px arriba */
-  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+
+  /* === Safe Area robusta — Dynamic Island / notch / sistemas no-iOS ===
+     · env(safe-area-inset-top) devuelve el inset real reservado por el SO
+       (Dynamic Island ≈ 59px, notch ≈ 47px, sin notch ≈ 20px).
+     · max(env(...), 8px) garantiza un mínimo de 8px aunque el navegador
+       devuelva 0 (Android, desktop, Safari fuera de modo PWA en algunos
+       contextos) — nunca habrá colisión con la barra de estado.
+     · El "+12px" añadido es respiración premium por encima del status bar
+       (grid 4/8/12/16), no se mezcla con el inset del sistema.
+     · Bottom 14px ≈ simetría visual con la respiración superior una vez
+       restado el border-bottom de 1px.
+     · safe-area-inset-left/right cubren iPhone en landscape: el contenido
+       no queda pegado al notch lateral. */
+  padding-top:    calc(max(env(safe-area-inset-top, 0px), 8px) + 12px);
+  padding-right:  max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: 14px;
+  padding-left:   max(16px, env(safe-area-inset-left, 0px));
 }
 .brand{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -30,7 +46,10 @@ h1{
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .meso-pill{
-  font-size:11px; color:var(--accent-2); margin-top:2px;
+  font-size:11px; color:var(--accent-2);
+  /* Separación de 4px (grid de 4): aire jerárquico h1 ↔ subtítulo, sin
+     romper la compacidad del header sticky. */
+  margin-top:4px;
   cursor:pointer; letter-spacing:.3px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
