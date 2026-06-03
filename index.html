@@ -1,176 +1,2804 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<meta name="theme-color" content="#0f1115">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rutina">
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/svg+xml" href="./icon.svg">
-<link rel="apple-touch-icon" href="./icon.svg">
-<title>Rutina — Tracker</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0d">
+<title>Kinetic PWA Tracker · Case Study</title>
+<style>
+  /* ============================================================
+     Design tokens — Apple Dark Mode / Silicon Valley
+     ============================================================ */
+  :root {
+    --bg:        #0b0b0d;
+    --surface:   #121214;
+    --surface-2: #18181c;
+    --surface-3: #1f1f24;
+    --border:    rgba(255,255,255,.07);
+    --border-strong: rgba(255,255,255,.12);
+    --text:      #f5f5f7;
+    --text-2:    #a8a8ad;
+    --muted:     #6b6b72;
+    --accent:    #ff6b00;
+    --accent-2:  #ffa45c;
+    --accent-bg: rgba(255,107,0,.10);
+    --good:      #34d399;
+    --bad:       #f87171;
+    --r-lg: 22px;
+    --r-md: 16px;
+    --r-sm: 10px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display",
+                 system-ui, "Helvetica Neue", Arial, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(900px 700px at 80% -10%, rgba(255,107,0,.07), transparent 60%),
+      radial-gradient(900px 700px at -10% 90%, rgba(255,164,92,.04), transparent 60%);
+    background-attachment: fixed;
+  }
+  button, input, select { font-family: inherit; }
+  ::selection { background: var(--accent); color: #1a0a00; }
 
-<link rel="stylesheet" href="./styles/tokens.css">
-<link rel="stylesheet" href="./styles/base.css">
-<link rel="stylesheet" href="./styles/layout.css">
-<link rel="stylesheet" href="./styles/components.css">
-<link rel="stylesheet" href="./styles/views.css">
-<link rel="stylesheet" href="./styles/animations.css">
-<link rel="stylesheet" href="./styles/active.css">
+  /* ============================================================
+     Layout · cabeceras de sección
+     ============================================================ */
+  section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 90px 24px;
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 3.6px;
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+  .sec-head { margin-bottom: 40px; }
+  .sec-head h2 {
+    font-size: clamp(28px, 4.2vw, 42px);
+    font-weight: 800;
+    letter-spacing: -0.7px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  .sec-head p {
+    font-size: 15px;
+    color: var(--text-2);
+    max-width: 640px;
+    line-height: 1.6;
+  }
+
+  /* ============================================================
+     1 · HERO
+     ============================================================ */
+  .hero {
+    padding: 130px 24px 110px;
+    text-align: center;
+    position: relative;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(550px 350px at 50% 30%, rgba(255,107,0,.10), transparent 65%);
+    pointer-events: none;
+  }
+  .hero > * { position: relative; }
+  .hero h1 {
+    font-size: clamp(46px, 8.5vw, 96px);
+    font-weight: 900;
+    line-height: 0.96;
+    letter-spacing: -2.5px;
+    margin-bottom: 22px;
+    background: linear-gradient(180deg, #ffffff 0%, #b2b2b8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero .subtitle {
+    font-size: clamp(16px, 2vw, 21px);
+    color: var(--text-2);
+    max-width: 720px;
+    margin: 0 auto 36px;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .hero .subtitle b { color: var(--text); font-weight: 700; }
+  .hero .body {
+    max-width: 700px;
+    margin: 0 auto;
+    font-size: 15px;
+    color: var(--text-2);
+    line-height: 1.75;
+  }
+  .hero .body b { color: var(--text); font-weight: 600; }
+  .hero-tags {
+    display: flex; gap: 8px;
+    justify-content: center; flex-wrap: wrap;
+    margin-top: 38px;
+  }
+  .tag {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 8px 15px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--text-2);
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+  }
+  .tag b { color: var(--accent); font-weight: 700; }
+
+  /* CTA principal · "Probar la app" */
+  .cta-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 38px;
+  }
+  .cta-primary {
+    background: var(--accent);
+    color: #1a0a00;
+    border: 0;
+    padding: 15px 28px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow:
+      0 12px 32px rgba(255,107,0,.34),
+      0 0 0 1px rgba(255,255,255,.04) inset;
+    transition: transform .12s, box-shadow .18s, background .15s;
+  }
+  .cta-primary:hover {
+    background: var(--accent-2);
+    box-shadow: 0 18px 44px rgba(255,107,0,.44);
+    transform: translateY(-1px);
+  }
+  .cta-primary:active { transform: translateY(0) scale(.985); }
+  .cta-primary .arrow { transition: transform .18s; }
+  .cta-primary:hover .arrow { transform: translateX(4px); }
+  .cta-note {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.2px;
+  }
+  .cta-note b { color: var(--text-2); font-weight: 600; }
+
+  /* ============================================================
+     2 · CONTEXTO MÓVIL · phone mockups
+     ============================================================ */
+  .mobile-context {
+    padding: 40px 24px 110px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .phones-wrap {
+    display: flex;
+    gap: 36px;
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .phone-mockup {
+    position: relative;
+    width: 280px;
+    aspect-ratio: 9 / 19.5;
+    background: linear-gradient(180deg, #232328 0%, #0e0e10 100%);
+    border-radius: 44px;
+    padding: 12px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.05) inset,
+      0 0 0 1.5px #2a2a30,
+      0 30px 80px rgba(0,0,0,.55),
+      0 0 60px rgba(255,107,0,.04);
+  }
+  .phone-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #0b0b0d;
+    border-radius: 34px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* La captura del iPhone YA incluye su status bar y Dynamic Island reales.
+     No dibujamos ninguna isla falsa encima — eso era lo que tapaba el header
+     "Mi rutina" y rompía el encaje. */
+  .phone-screen img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    position: relative;
+    z-index: 2; /* tapa el fallback cuando carga */
+  }
+  .phone-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 80px 20px 40px;
+    background: radial-gradient(120% 80% at 50% 20%, rgba(255,107,0,.06), transparent 65%), #0b0b0d;
+    z-index: 1;
+  }
+  .phone-fallback b {
+    display: block;
+    color: var(--text-2);
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .phone-caption {
+    text-align: center;
+    color: var(--text-2);
+    font-size: 12px;
+    margin-top: 14px;
+    letter-spacing: 0.3px;
+  }
+  .phone-caption b { color: var(--text); font-weight: 600; }
+
+  /* ============================================================
+     3 · MÓDULO · Arquitectura de Rutinas (interactivo)
+     ============================================================ */
+  .routine-builder {
+    background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 26px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.4);
+  }
+  .rb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .rb-day {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    transition: border-color .15s, transform .15s;
+    animation: dayIn .35s ease both;
+  }
+  @keyframes dayIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .rb-day-head {
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rb-day-title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    color: var(--text);
+  }
+  .rb-day-sub {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 3px;
+    letter-spacing: 0.2px;
+  }
+  .rb-day-count {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    background: var(--accent-bg);
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .rb-exs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 16px;
+    min-height: 36px;
+  }
+  .rb-ex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text);
+    animation: exIn .25s ease both;
+  }
+  @keyframes exIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .rb-ex-name { font-weight: 600; }
+  .rb-ex-sets {
+    font-size: 11px;
+    color: var(--accent-2);
+    background: var(--accent-bg);
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .rb-empty {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 6px 4px;
+  }
+  .rb-day-foot {
+    padding: 10px 16px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .rb-add-ex {
+    background: var(--surface-3);
+    border: 1px dashed rgba(255,255,255,.12);
+    color: var(--text-2);
+    font-size: 12px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    flex: 1;
+    cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .rb-add-ex:hover {
+    border-color: var(--accent);
+    color: var(--accent-2);
+    background: rgba(255,107,0,.06);
+  }
+  .rb-picker {
+    flex: 1;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23ff6b00' d='M6 8L0 0h12z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    outline: none;
+  }
+  .rb-picker:focus { border-color: var(--accent); }
+  .rb-cancel {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 6px;
+    line-height: 1;
+  }
+  .rb-cancel:hover { color: var(--bad); }
+
+  .rb-add-day {
+    margin-top: 18px;
+    width: 100%;
+    background: var(--accent);
+    color: #1a0a00;
+    border: 0;
+    padding: 14px;
+    border-radius: var(--r-md);
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .15s, background .15s;
+    box-shadow: 0 8px 24px rgba(255,107,0,.18);
+  }
+  .rb-add-day:hover {
+    background: var(--accent-2);
+    box-shadow: 0 12px 30px rgba(255,107,0,.28);
+  }
+  .rb-add-day:active { transform: scale(.985); }
+
+  .rb-new-day-row {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--surface-2);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-md);
+    padding: 12px;
+    animation: dayIn .25s ease both;
+  }
+  .rb-new-day-row input {
+    flex: 1;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 10px;
+    outline: none;
+  }
+  .rb-new-day-row input:focus { border-color: var(--accent); }
+  .rb-new-day-row button {
+    background: var(--accent);
+    color: #1a0a00;
+    border: 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  /* ============================================================
+     4 · BENTO GRID
+     ============================================================ */
+  .bento {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .b-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    min-height: 170px;
+    backdrop-filter: blur(10px);
+  }
+  .b-big {
+    grid-column: 1 / -1;
+    background:
+      radial-gradient(120% 80% at 100% 0%, rgba(255,107,0,.12), transparent 60%),
+      linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+    border-color: rgba(255,107,0,.20);
+    padding: 28px;
+  }
+  .b-label {
+    font-size: 10px;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+  }
+  .b-big .b-val {
+    font-size: clamp(38px, 7vw, 58px);
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -1.8px;
+    margin-top: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .b-big .b-unit { font-size: 17px; color: var(--text-2); font-weight: 600; letter-spacing: 0; }
+  .b-big .b-ex {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 6px;
+    opacity: .9;
+  }
+  .b-pro {
+    position: absolute;
+    top: 18px; right: 18px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--good), #16a34a);
+    color: #04210f;
+    padding: 5px 11px;
+    border-radius: 999px;
+    box-shadow: 0 2px 14px rgba(52,211,153,.3);
+  }
+  .b-spark {
+    margin-top: 18px;
+    width: 100%; height: 58px;
+    display: block;
+  }
+  .b-card .b-val {
+    font-size: 32px;
+    font-weight: 800;
+    margin-top: 10px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.05;
+    letter-spacing: -.5px;
+  }
+  .b-card .b-sub {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: 8px;
+  }
+  .b-trend { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .b-trend.up { color: var(--good); }
+  .b-trend.flat { color: var(--accent); }
+  .b-cons .b-val { font-size: 38px; }
+  .b-dots {
+    display: flex; gap: 7px;
+    margin-top: 16px;
+    align-items: center;
+  }
+  .b-dots span {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.08);
+  }
+  .b-dots span.on {
+    background: var(--accent);
+    box-shadow: 0 0 10px rgba(255,107,0,.7);
+  }
+  .b-focus {
+    background:
+      linear-gradient(135deg, rgba(255,164,92,.09), transparent 60%),
+      var(--surface);
+    border-color: rgba(255,164,92,.18);
+  }
+  .b-focus .b-val { font-size: 28px; color: var(--accent-2); }
+  .b-focus .b-coach {
+    white-space: normal; line-height: 1.55;
+    margin-top: 10px; font-size: 13px;
+  }
+  .b-focus .b-coach b { color: var(--text); font-weight: 600; }
+
+  /* ============================================================
+     5 · ACTIVE WORKOUT PLAYER · con celebración de PR
+     ============================================================ */
+  .player {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    max-width: 470px;
+    margin: 0 auto;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.4);
+    position: relative; /* host para confeti + banner PR */
+  }
+  .player-top {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pt-elapsed {
+    font-size: 22px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+  }
+  .pt-routine {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 3px;
+  }
+  .pt-finish {
+    background: var(--accent);
+    color: #1a0a00;
+    border: 0;
+    padding: 10px 17px;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: transform .12s;
+  }
+  .pt-finish:active { transform: scale(.97); }
+
+  .player-body { padding: 22px 22px 26px; position: relative; z-index: 1; }
+  .p-ex-name {
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+  }
+  .p-ex-meta {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: 5px;
+  }
+
+  .p-set {
+    margin-top: 22px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 16px;
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .p-set.under {
+    border-color: rgba(255,107,0,.5);
+    box-shadow: inset 0 0 0 1px rgba(255,107,0,.12);
+  }
+  .p-set.saved {
+    border-color: rgba(52,211,153,.45);
+    box-shadow: inset 0 0 0 1px rgba(52,211,153,.18);
+  }
+  .p-set-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 13px;
+  }
+  .p-set-num { font-size: 13px; font-weight: 700; color: var(--text); }
+  .p-target {
+    font-size: 11px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .p-target b { color: var(--accent); font-weight: 700; }
+
+  .p-stepper {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+  .p-step {
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    color: var(--accent-2);
+    font-size: 22px;
+    font-weight: 800;
+    padding: 14px 0;
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background .14s, transform .1s, border-color .14s;
+  }
+  .p-step:hover { border-color: rgba(255,107,0,.4); }
+  .p-step:active {
+    transform: scale(.93);
+    background: rgba(255,107,0,.16);
+  }
+  .p-val {
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    border-radius: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    user-select: none;
+  }
+  .p-set.under .p-val { color: var(--accent-2); }
+
+  .p-under-msg {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--accent-2);
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity .2s, max-height .25s;
+  }
+  .p-set.under .p-under-msg {
+    opacity: 1;
+    max-height: 30px;
+  }
+
+  .p-rpe { margin-top: 24px; }
+  .p-rpe-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .p-rpe-label {
+    font-size: 11px;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    font-weight: 700;
+  }
+  .p-rpe-val {
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .p-rpe-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: linear-gradient(90deg,
+      var(--accent) 0%, var(--accent) var(--pct, 70%),
+      var(--surface-3) var(--pct, 70%), var(--surface-3) 100%);
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+  }
+  .p-rpe-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 3px solid #1a0a00;
+    box-shadow: 0 0 12px rgba(255,107,0,.6);
+  }
+  .p-rpe-slider::-moz-range-thumb {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid #1a0a00;
+    cursor: pointer;
+  }
+  .p-rpe-desc {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+  .p-rpe-desc b { color: var(--text); font-weight: 600; }
+
+  /* Botón "Guardar Serie / Confirmar Set" */
+  .p-save {
+    width: 100%;
+    margin-top: 26px;
+    background: var(--accent);
+    color: #1a0a00;
+    border: 0;
+    padding: 16px;
+    border-radius: var(--r-md);
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: transform .12s, background .18s, box-shadow .18s;
+    box-shadow: 0 8px 24px rgba(255,107,0,.22);
+  }
+  .p-save:hover {
+    background: var(--accent-2);
+    box-shadow: 0 12px 32px rgba(255,107,0,.32);
+  }
+  .p-save:active { transform: scale(.985); }
+  .p-save.saved {
+    background: var(--good);
+    color: #052e1c;
+    box-shadow: 0 8px 24px rgba(52,211,153,.25);
+  }
+
+  /* Confeti host + piezas */
+  .confetti-host {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 30;
+  }
+  /* Confeti · `left` lleva la posición horizontal inicial en píxeles (absoluta
+     respecto al host). `--dx` es el desplazamiento lateral durante la caída,
+     también en píxeles. Evitamos porcentajes dentro de translate3d porque ahí
+     los `%` son relativos al PROPIO elemento (9px), no al contenedor — que era
+     la causa de que todas las piezas cayeran en x≈0 (borde izquierdo). */
+  .confetti-piece {
+    position: absolute;
+    top: 0;
+    width: 9px;
+    height: 14px;
+    border-radius: 2px;
+    opacity: 0;
+    will-change: transform, opacity;
+    animation: confetti-fall var(--dur, 1.8s) cubic-bezier(.2,.6,.4,1) forwards;
+    animation-delay: var(--delay, 0s);
+  }
+  @keyframes confetti-fall {
+    0%   { transform: translate3d(0, -30px, 0) rotate(0deg); opacity: 0; }
+    8%   { opacity: 1; }
+    100% { transform: translate3d(var(--dx, 0px), 580px, 0) rotate(var(--rot)); opacity: 0; }
+  }
+
+  /* Banner emergente "¡NUEVO RÉCORD PERSONAL!" */
+  .pr-banner {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(.78);
+    background:
+      linear-gradient(140deg, rgba(255,107,0,.22) 0%, rgba(255,164,92,.10) 60%, rgba(52,211,153,.18) 100%),
+      rgba(18,18,20,.86);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,107,0,.45);
+    border-radius: 20px;
+    padding: 22px 26px;
+    text-align: center;
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s, transform .4s cubic-bezier(.18, 1.45, .4, 1);
+    box-shadow:
+      0 30px 80px rgba(255,107,0,.28),
+      0 0 0 1px rgba(255,255,255,.04) inset;
+    max-width: 320px;
+    width: calc(100% - 60px);
+  }
+  .pr-banner.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .pr-banner h4 {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .pr-banner p {
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.45;
+    font-weight: 500;
+  }
+  .pr-banner p b { color: var(--accent-2); font-weight: 800; }
+  .pr-banner .rocket {
+    display: inline-block;
+    font-size: 22px;
+    margin-left: 4px;
+    animation: rocket-bob 1.4s ease-in-out infinite;
+  }
+  @keyframes rocket-bob {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50%      { transform: translateY(-3px) rotate(2deg); }
+  }
+
+  /* ============================================================
+     5b · PROGRESO POR EJERCICIO · selector + KPIs + charts SVG
+     ============================================================ */
+  .progress-card {
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 22px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.4);
+  }
+  .pg-picker {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1.5px solid var(--border-strong);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23ff6b00' d='M6 8L0 0h12z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 42px;
+    outline: none;
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .pg-picker:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(255,107,0,.12);
+  }
+
+  .pg-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .pg-kpi {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 12px 11px 14px;
+  }
+  .pg-kpi-label {
+    font-size: 10px;
+    color: var(--text-2);
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .pg-kpi-val {
+    margin-top: 6px;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1.05;
+  }
+  .pg-kpi-val .u {
+    font-size: 11px;
+    color: var(--text-2);
+    font-weight: 600;
+    margin-left: 1px;
+  }
+
+  .pg-chart-card {
+    margin-top: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 16px 16px 10px;
+    position: relative; /* host del tooltip absoluto */
+  }
+  .pg-chart-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .pg-chart-title .ttl {
+    font-size: 12px;
+    color: var(--text-2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+  .pg-chart-title .sub {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pg-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    font-family: inherit;
+    overflow: visible;
+  }
+  .pg-grid { stroke: rgba(255,255,255,.045); stroke-width: 1; }
+  .pg-axis {
+    fill: var(--text-2);
+    font-size: 10px;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  .pg-line {
+    stroke: var(--accent);
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .pg-line.soft {
+    stroke: var(--accent-2);
+    stroke-width: 1.8;
+  }
+  .pg-dot { fill: var(--accent); transition: r .15s ease; }
+  .pg-dot.soft { fill: var(--accent-2); }
+  .pg-dot.active { r: 5; }
+  .pg-dot.active.soft { r: 5; }
+  /* Hit area transparente más grande para que el dedo capture el dot */
+  .pg-hit {
+    fill: transparent;
+    cursor: pointer;
+  }
+  .pg-hit:hover + .pg-dot,
+  .pg-hit:focus + .pg-dot { r: 4.5; }
+
+  /* Tooltip absoluto dentro de .pg-chart-card */
+  .pg-tip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 7px 12px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--text);
+    box-shadow:
+      0 10px 26px rgba(0,0,0,.45),
+      0 0 0 1px rgba(0,0,0,.2);
+    opacity: 0;
+    z-index: 5;
+    transform: translate(-50%, calc(-100% - 14px)) scale(.9);
+    transform-origin: bottom center;
+    transition: opacity .18s, transform .22s cubic-bezier(.2, 1.4, .4, 1);
+  }
+  .pg-tip.show {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 14px)) scale(1);
+  }
+  /* Variante "abajo" cuando el punto está muy pegado al borde superior */
+  .pg-tip.below {
+    transform: translate(-50%, 14px) scale(.9);
+    transform-origin: top center;
+  }
+  .pg-tip.below.show {
+    transform: translate(-50%, 14px) scale(1);
+  }
+  .pg-tip .d {
+    display: block;
+    font-size: 10px;
+    color: var(--text-2);
+    letter-spacing: 0.6px;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .pg-tip .v {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-2);
+    font-size: 14px;
+    letter-spacing: -0.3px;
+  }
+  .pg-tip .v em {
+    font-style: normal;
+    font-size: 10.5px;
+    color: var(--text-2);
+    font-weight: 600;
+    margin-left: 2px;
+  }
+  /* Flecha apuntando al punto */
+  .pg-tip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -5px;
+    width: 9px; height: 9px;
+    background: var(--surface-3);
+    border-right: 1px solid var(--border-strong);
+    border-bottom: 1px solid var(--border-strong);
+    transform: translateX(-50%) rotate(45deg);
+  }
+  .pg-tip.below::after {
+    top: -5px; bottom: auto;
+    border-right: 0; border-bottom: 0;
+    border-left: 1px solid var(--border-strong);
+    border-top: 1px solid var(--border-strong);
+  }
+
+  /* ============================================================
+     6 · HISTORIAL · Tab bar + Bitácora + Por ejercicio (chips)
+     ============================================================ */
+  .hist { max-width: 760px; margin: 0 auto; }
+  .hist-search {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 13px 16px;
+    color: var(--text-2);
+    font-size: 14px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .hist-search .ico {
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .hist-tabs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3px;
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-bottom: 18px;
+  }
+  .ht-tab {
+    background: transparent; border: 0;
+    color: var(--text-2);
+    font-size: 13px; font-weight: 600;
+    padding: 11px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .ht-tab.on {
+    background: var(--surface-3);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,.5);
+  }
+  .pane { display: none; animation: fadeIn .3s ease both; }
+  .pane.on { display: block; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Day cards (bitácora) */
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 15px 16px;
+    margin-bottom: 10px;
+  }
+  .day-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding-bottom: 9px; margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .day-date {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent-2);
+    letter-spacing: 0.2px;
+  }
+  .day-routine {
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .day-rows { display: flex; flex-direction: column; gap: 4px; }
+  .day-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 10px; align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px dashed rgba(255,255,255,.04);
+    font-size: 12px;
+  }
+  .day-row:last-child { border-bottom: 0; }
+  .day-ex {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .day-target {
+    background: rgba(255,255,255,.05);
+    color: var(--text-2);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    align-self: center;
+  }
+  .day-vals {
+    color: var(--accent-2);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 12px;
+  }
+
+  /* Por ejercicio · cajas + chips de progresión (1:1 con la captura) */
+  .px-eyebrow {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 4px 4px 14px;
+  }
+  .px-eyebrow .lbl {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2.4px;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+  .px-eyebrow .sub {
+    font-size: 12px;
+    color: var(--text-2);
+    letter-spacing: 0.2px;
+  }
+
+  .ex-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .ex-box-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+    gap: 12px;
+  }
+  .ex-box-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.1px;
+  }
+  .ex-box-meta {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 3px;
+    letter-spacing: 0.2px;
+  }
+  .ex-box-trend {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--good);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ex-box-trend.flat {
+    color: var(--text-2);
+    font-weight: 600;
+  }
+
+  /* Carrusel horizontal de chips */
+  .ex-chips {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 8px 2px 6px;
+    margin: -8px -2px -6px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ex-chips::-webkit-scrollbar { display: none; }
+
+  .ex-chip {
+    flex: 0 0 auto;
+    width: 96px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 8px 9px;
+    text-align: center;
+    position: relative;
+    scroll-snap-align: start;
+    transition: transform .15s, border-color .15s;
+  }
+  .ex-chip:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-strong);
+  }
+  .ex-chip-date {
+    font-size: 11px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.1px;
+  }
+  .ex-chip-weight {
+    margin-top: 2px;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .ex-chip-weight .u {
+    font-size: 11px;
+    color: var(--text-2);
+    font-weight: 600;
+    margin-left: 1px;
+  }
+  .ex-chip-reps {
+    margin-top: 5px;
+    font-size: 11px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.2px;
+  }
+  .ex-chip-pos {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  /* PR chip · variante con tonos verdes + sticker naranja inclinado */
+  .ex-chip.pr {
+    background:
+      linear-gradient(180deg, rgba(52,211,153,.10) 0%, rgba(52,211,153,.03) 100%),
+      var(--surface-2);
+    border-color: rgba(52,211,153,.32);
+  }
+  .ex-chip.pr .ex-chip-weight { color: var(--good); }
+  .ex-chip.pr .ex-chip-weight .u { color: rgba(52,211,153,.65); }
+
+  .ex-chip-pr-badge {
+    position: absolute;
+    top: -7px;
+    right: -6px;
+    background: linear-gradient(135deg, #ff8a3d 0%, #ff6b00 100%);
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    transform: rotate(8deg);
+    box-shadow:
+      0 4px 12px rgba(255,107,0,.45),
+      0 0 0 1px rgba(0,0,0,.2);
+    z-index: 2;
+    text-shadow: 0 1px 1px rgba(0,0,0,.18);
+  }
+
+  /* ============================================================
+     7 · QA / Human-in-the-loop
+     ============================================================ */
+  .qa-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .qa-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 24px;
+  }
+  .qa-card h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .qa-card h3 .pill {
+    font-size: 10px;
+    font-weight: 800;
+    background: var(--accent-bg);
+    color: var(--accent-2);
+    padding: 3px 9px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+  }
+  .qa-card p {
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.65;
+    margin-bottom: 12px;
+  }
+  .qa-card p b { color: var(--text); font-weight: 600; }
+  .qa-code {
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+    font-size: 11.5px;
+    color: var(--accent-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 13px;
+    border-radius: 8px;
+    margin-top: 8px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .qa-code .kw { color: var(--accent); }
+  .qa-code .com { color: var(--muted); }
+
+  /* ============================================================
+     8 · FOOTER
+     ============================================================ */
+  footer {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+  footer .credit {
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  footer .credit b { color: var(--text); font-weight: 700; letter-spacing: 0.2px; }
+  footer .credit .ai { color: var(--accent); font-weight: 700; }
+  footer .meta {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* ============================================================
+     Responsive
+     ============================================================ */
+  @media (max-width: 640px) {
+    section { padding: 64px 18px; }
+    .hero { padding: 90px 18px 70px; }
+    .mobile-context { padding: 20px 14px 70px; }
+    /* Móviles SIEMPRE lado a lado · sin wrap, escalando proporcionalmente.
+       Cada item ocupa la mitad del ancho disponible (- gap) y el .phone-mockup
+       interno usa width:100% para llenarlo, manteniendo aspect-ratio 9/19.5. */
+    .phones-wrap {
+      gap: 14px;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      max-width: 460px;
+      margin: 0 auto;
+    }
+    .phones-wrap > div {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .phone-mockup {
+      width: 100%;
+      padding: 8px;
+      border-radius: 30px;
+    }
+    .phone-screen { border-radius: 22px; }
+    .phone-caption { font-size: 11px; }
+    .bento { grid-template-columns: 1fr; }
+    .qa-grid { grid-template-columns: 1fr; }
+    .b-big { padding: 22px; }
+    .routine-builder { padding: 20px; }
+    .ex-chip { width: 88px; }
+    .pg-kpis { grid-template-columns: 1fr 1fr; }
+    .pg-kpi-val { font-size: 19px; }
+    .progress-card { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+    html { scroll-behavior: auto; }
+  }
+</style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <div class="brand-left">
-      <h1 id="appTitle">Rutina</h1>
-      <span class="meso-pill" id="mesoPill">— tu rutina</span>
+
+<!-- ============================================================
+     1 · HERO
+     ============================================================ -->
+<section class="hero">
+  <div class="eyebrow">Case Study · 2026</div>
+  <h1>KINETIC PWA<br>TRACKER</h1>
+  <p class="subtitle">
+    <b>Case Study:</b> Pushing the Frontiers of AI-Collaborative Software Engineering.
+  </p>
+  <p class="body">
+    Un experimento de optimización de flujos de desarrollo donde <b>modelos fundacionales avanzados</b> generan código bajo dirección humana estricta, y donde yo asumo el rol de <b>Product Owner</b>: arquitectura, métricas de calidad, decisiones de UX y validación contra datos reales. La IA multiplica la velocidad de implementación; la dirección de producto no se delega.
+    <br><br>
+    Resultado: una PWA <b>vanilla JS sin frameworks</b>, offline-first, instalable, construida sobre datos reales de seis meses de entrenamiento. Cero dependencias en runtime. Cero build step. Diseño que paso horas mirando.
+  </p>
+  <div class="hero-tags">
+    <span class="tag"><b>Vanilla JS</b> · 0 dependencies</span>
+    <span class="tag"><b>586</b> sesiones reales</span>
+    <span class="tag"><b>PWA</b> offline-first</span>
+    <span class="tag"><b>Human-in-the-loop</b></span>
+  </div>
+
+  <!-- CTA principal · enlaza a la app deployada en /app/ del mismo dominio.
+       Path relativo → no necesita actualización si cambia la URL del site. -->
+  <div class="cta-row">
+    <a href="/app/" class="cta-primary" target="_blank" rel="noopener">
+      Abrir la app · empieza desde cero
+      <span class="arrow">→</span>
+    </a>
+  </div>
+  <p class="cta-note">
+    <b>Sin registro · sin servidor</b> — tus datos viven en tu navegador. Instalable como PWA en iOS desde Safari (Compartir → Añadir a pantalla de inicio).
+  </p>
+</section>
+
+<!-- ============================================================
+     2 · CONTEXTO MÓVIL · phone mockups
+     ============================================================ -->
+<div class="mobile-context">
+  <div class="phones-wrap">
+
+    <!-- Insertar aquí IMG_5059.PNG e IMG_5057.jpg para dar contexto instantáneo de aplicación móvil -->
+    <div>
+      <div class="phone-mockup">
+        <div class="phone-screen">
+          <div class="phone-fallback">
+            <b>IMG_5059.PNG</b>
+            [ Vista de la App en Dispositivo Móvil ]
+          </div>
+          <img src="IMG_5059.PNG?v=3" alt="Pantalla de inicio · Mi rutina">
+        </div>
+      </div>
+      <div class="phone-caption"><b>Home</b> · selector de rutinas con CTA "hoy es martes"</div>
     </div>
-    <div class="h-actions">
-      <button class="icon-btn" id="todayPill">·</button>
-      <button class="icon-btn" id="btnSettings" aria-label="Ajustes">⚙</button>
+
+    <div>
+      <div class="phone-mockup">
+        <div class="phone-screen">
+          <div class="phone-fallback">
+            <b>IMG_5057.jpg</b>
+            [ Vista de la App en Dispositivo Móvil ]
+          </div>
+          <img src="IMG_5057.jpg?v=3" alt="Vista de Análisis · Bento Grid">
+        </div>
+      </div>
+      <div class="phone-caption"><b>Análisis</b> · Bento Grid + volumen semanal por grupo</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================================
+     3 · MÓDULO · Arquitectura de Rutinas (interactivo)
+     ============================================================ -->
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Módulo · Arquitectura de Rutinas</div>
+    <h2>Configura tu semana antes de pisar el gimnasio</h2>
+    <p>El usuario diseña su microciclo: añade <b>días</b> (Lunes: Pierna/Hombro, Martes: Brazos/Hombro, Jueves: Piernas…) y dentro de cada día compone los <b>ejercicios</b> con sus series objetivo. Toda la configuración se persiste en IndexedDB vía Dexie; el player de entrenamiento la consume en runtime.</p>
+  </div>
+
+  <div class="routine-builder">
+    <div class="rb-list" id="rbList"></div>
+    <button class="rb-add-day" id="rbAddDay" type="button">+ Añadir Día</button>
+  </div>
+</section>
+
+<!-- ============================================================
+     4 · BENTO GRID
+     ============================================================ -->
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Módulo · Dashboard</div>
+    <h2>Bento Grid · Insights con jerarquía visual</h2>
+    <p>Una cuadrícula asimétrica donde el tamaño de cada tarjeta refleja la importancia del dato. Lógica derivada del histórico real importado desde un Excel de seis meses.</p>
+  </div>
+
+  <div class="bento">
+    <!-- Hero card -->
+    <div class="b-card b-big">
+      <span class="b-pro">Progresión Pro</span>
+      <div class="b-label">Hitos de fuerza · temporada</div>
+      <div class="b-val">+56<span class="b-unit"> kg 1RM</span></div>
+      <div class="b-ex">Sentadilla con barra</div>
+      <svg class="b-spark" viewBox="0 0 600 90" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ff6b00" stop-opacity=".55"/>
+            <stop offset="100%" stop-color="#ff6b00" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,76 L40,72 80,68 120,63 160,60 200,54 240,49 280,42 320,38 360,32 400,26 440,22 480,17 520,13 560,10 600,6 L600,90 L0,90 Z"
+              fill="url(#sparkGrad)"/>
+        <polyline points="0,76 40,72 80,68 120,63 160,60 200,54 240,49 280,42 320,38 360,32 400,26 440,22 480,17 520,13 560,10 600,6"
+                  fill="none" stroke="#ff6b00" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Volumen -->
+    <div class="b-card">
+      <div class="b-label">Volumen total semanal</div>
+      <div class="b-val">12 400 <span style="font-size:14px; color:var(--text-2); font-weight:600">kg</span></div>
+      <div class="b-sub">
+        <span class="b-trend up">↑ +10%</span> &nbsp;vs. semana anterior
+      </div>
+    </div>
+
+    <!-- Consistencia -->
+    <div class="b-card b-cons">
+      <div class="b-label">Consistencia</div>
+      <div class="b-val">14<span style="font-size:14px; color:var(--text-2); font-weight:600"> ses.</span></div>
+      <div class="b-sub">este mes</div>
+      <div class="b-dots">
+        <span class="on"></span><span class="on"></span>
+        <span class="on"></span><span class="on"></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- Enfoque IA -->
+    <div class="b-card b-focus">
+      <div class="b-label">Enfoque sugerido por IA</div>
+      <div class="b-val">Isquios y Gemelos</div>
+      <div class="b-coach">
+        Detectado volumen un <b>15% inferior</b> en la última quincena. Priorizar en el próximo bloque de entrenamiento.
+      </div>
     </div>
   </div>
-</header>
+</section>
 
-<main>
-  <!-- RUTINA (Home + vista de rutina activa) -->
-  <section id="tab-inicio" class="tab active">
-    <div id="view-home" class="subview active">
-      <div class="home-title"><span>Tus rutinas</span><a id="quickEdit">gestionar</a></div>
-      <div id="streakBanner"></div>
-      <div class="home-grid" id="routineGrid"></div>
+<!-- ============================================================
+     5 · ACTIVE WORKOUT PLAYER · con celebración de PR
+     ============================================================ -->
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Módulo · Active Workout</div>
+    <h2>El player real · stepper, RPE y celebración de PR</h2>
+    <p>Sin teclado nativo en el gym. Stepper [- N +], "snap to target" en el primer toque, aviso visual si te quedas por debajo del estímulo, slider RPE con feedback de coach, y al <b>guardar la serie</b>, si entras dentro o por encima del rango → confeti + banner emergente "¡Nuevo Récord Personal!".</p>
+  </div>
+
+  <div class="player" id="player">
+    <!-- Confeti host (cubre todo el player) -->
+    <div class="confetti-host" id="confettiHost" aria-hidden="true"></div>
+
+    <!-- Banner emergente de PR -->
+    <div class="pr-banner" id="prBanner" role="status" aria-live="polite">
+      <h4>¡Nuevo Récord Personal!</h4>
+      <p>Has superado tu marca anterior <b>+2.5 kg</b><span class="rocket">🚀</span></p>
     </div>
-    <div id="view-routine" class="subview">
-      <div class="route-head">
-        <button class="route-back" id="btnBack" aria-label="Volver">‹</button>
-        <div class="route-title">
-          <h2 id="routeName">—</h2>
-          <div class="r-sub" id="routeSub">—</div>
-        </div>
-        <input type="date" id="dateInput" class="date-input">
+
+    <div class="player-top">
+      <div>
+        <div class="pt-elapsed" id="elapsed">00:00:00</div>
+        <div class="pt-routine">Día 2 · Piernas · Mi rutina</div>
       </div>
-      <div id="muscleMap"></div>
-      <div id="exerciseList"></div>
+      <button class="pt-finish" type="button">Terminar</button>
     </div>
-  </section>
 
-  <!-- HISTORIAL -->
-  <section id="tab-historial" class="tab">
-    <div class="hist-filter">
-      <select id="filterGroup"><option value="">Todos los grupos</option></select>
+    <div class="player-body">
+      <div class="p-ex-name">Sentadilla con barra</div>
+      <div class="p-ex-meta">Piernas · 3 × 12-15 · descanso 2:00</div>
+
+      <div class="p-set" id="set1">
+        <div class="p-set-head">
+          <span class="p-set-num">Serie 1 · 60 kg</span>
+          <span class="p-target">Objetivo: <b>12-15</b> reps</span>
+        </div>
+        <div class="p-stepper">
+          <button class="p-step" id="repsDec" type="button" aria-label="Restar repetición">−</button>
+          <div class="p-val" id="repsVal">—</div>
+          <button class="p-step" id="repsInc" type="button" aria-label="Sumar repetición">+</button>
+        </div>
+        <div class="p-under-msg">⚠ Por debajo del estímulo objetivo</div>
+      </div>
+
+      <div class="p-rpe">
+        <div class="p-rpe-head">
+          <span class="p-rpe-label">RPE · Rate of Perceived Exertion</span>
+          <span class="p-rpe-val" id="rpeVal">8</span>
+        </div>
+        <input type="range" min="1" max="10" step="1" value="8"
+               class="p-rpe-slider" id="rpeSlider"
+               style="--pct: 70%;">
+        <div class="p-rpe-desc" id="rpeDesc">
+          RPE 8 · <b>2 repeticiones en reserva.</b> Esfuerzo alto, técnica controlada.
+        </div>
+      </div>
+
+      <button class="p-save" id="saveBtn" type="button">Guardar Serie / Confirmar Set</button>
     </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     5b · PROGRESO POR EJERCICIO · selector + KPIs + gráficos SVG
+     ============================================================ -->
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Módulo · Progreso por ejercicio</div>
+    <h2>Curva de fuerza y volumen · vista por ejercicio</h2>
+    <p>Selecciona un ejercicio del histórico y la app recompone en tiempo real los KPIs (última carga, PR, 1RM estimado, posición media) y redibuja las dos curvas: <b>top set en kg</b> y <b>volumen total Σ(peso × reps) por sesión</b>. Gráficos en SVG nativo, cero librerías.</p>
+  </div>
+
+  <div class="progress-card">
+    <select class="pg-picker" id="pgPicker" aria-label="Selecciona un ejercicio">
+      <option value="lat">Tirón de Lat inclinado</option>
+      <option value="squat">Sentadilla con barra</option>
+      <option value="bench">Press de banca</option>
+      <option value="hip">Hip thrust</option>
+    </select>
+
+    <div class="pg-kpis">
+      <div class="pg-kpi">
+        <div class="pg-kpi-label">Última</div>
+        <div class="pg-kpi-val" id="pgLast">—</div>
+      </div>
+      <div class="pg-kpi">
+        <div class="pg-kpi-label">PR</div>
+        <div class="pg-kpi-val" id="pgPr">—</div>
+      </div>
+      <div class="pg-kpi">
+        <div class="pg-kpi-label">1RM est.</div>
+        <div class="pg-kpi-val" id="pg1rm">—</div>
+      </div>
+      <div class="pg-kpi">
+        <div class="pg-kpi-label">Pos. media</div>
+        <div class="pg-kpi-val" id="pgPos">—</div>
+      </div>
+    </div>
+
+    <div class="pg-chart-card">
+      <div class="pg-chart-title">
+        <span class="ttl">Progreso de fuerza</span>
+        <span class="sub">peso máximo · top set</span>
+      </div>
+      <div id="pgChartStrength"></div>
+    </div>
+
+    <div class="pg-chart-card">
+      <div class="pg-chart-title">
+        <span class="ttl">Volumen total</span>
+        <span class="sub">Σ(peso × reps) por sesión</span>
+      </div>
+      <div id="pgChartVolume"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     6 · HISTORIAL — Tab bar + Bitácora + Por ejercicio (chips PR)
+     ============================================================ -->
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Módulo · Historial</div>
+    <h2>Bitácora vs. desglose por ejercicio</h2>
+    <p>Dos formas complementarias de revivir el entrenamiento: feed cronológico estilo Excel para el scroll rápido, y <b>desglose por ejercicio</b> con chips de progresión y sticker PR — fiel 1:1 a la captura real.</p>
+  </div>
+
+  <div class="hist">
+    <div class="hist-search"><span class="ico">⌕</span> Filtrar por grupo o ejercicio…</div>
 
     <div class="hist-tabs" role="tablist">
-      <button class="ht-tab on" type="button" data-pane="bit" role="tab" aria-selected="true">Bitácora</button>
-      <button class="ht-tab" type="button" data-pane="chip" role="tab" aria-selected="false">Por ejercicio</button>
+      <button class="ht-tab on" data-pane="paneBit" type="button" role="tab">Bitácora · Excel Style</button>
+      <button class="ht-tab" data-pane="paneEx" type="button" role="tab">Por ejercicio</button>
     </div>
 
-    <div class="hist-pane" id="histPaneBit" role="tabpanel">
-      <div id="bitacora"></div>
-    </div>
-    <div class="hist-pane hidden" id="histPaneChip" role="tabpanel">
-      <div id="historyList"></div>
-    </div>
-  </section>
+    <!-- Pane: Bitácora -->
+    <div class="pane on" id="paneBit" role="tabpanel">
 
-  <!-- PROGRESO -->
-  <section id="tab-progreso" class="tab">
-    <div class="hist-filter">
-      <select id="progressExercise"></select>
-    </div>
-    <div class="stats" id="progressStats"></div>
-    <div class="chart-card">
-      <div class="chart-title">Progreso de fuerza <small>peso máximo · top set</small></div>
-      <div class="chart-canvas-wrap"><canvas id="chartCanvas" height="200"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Volumen total <small>Σ(peso × reps) por sesión</small></div>
-      <div class="chart-canvas-wrap"><canvas id="volumeCanvas" height="200"></canvas></div>
-    </div>
-    <div id="suggestionBox"></div>
-  </section>
-
-  <!-- ANÁLISIS -->
-  <section id="tab-analisis" class="tab">
-    <div class="an-bento" id="anBento"></div>
-
-    <h4 class="an-h4">Volumen semanal por grupo</h4>
-    <div id="volChart"><canvas id="volCanvas" height="220"></canvas></div>
-
-    <div class="mh-card">
-      <div class="mh-title">Mapa de calor muscular <small>carga · últimos 30 días</small></div>
-      <div class="mh-body">
-        <div class="mh-svg" id="muscleHeatmap"></div>
-        <div class="mh-side">
-          <div class="mh-legend"><span>bajo</span><i class="mh-bar"></i><span>alto</span></div>
-          <ol class="mh-top" id="muscleHeatTop"></ol>
+      <div class="day-card">
+        <div class="day-head">
+          <div class="day-date">Lunes, 1 de junio</div>
+          <div class="day-routine">Día 4 · Piernas</div>
         </div>
-      </div>
-    </div>
-
-    <div class="heatmap">
-      <div class="hm-title">Frecuencia de entrenamiento <small>últimas 12 semanas</small></div>
-      <div class="hm-body">
-        <div class="hm-months" id="hmMonths"></div>
-        <div class="hm-row">
-          <div class="hm-days">
-            <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+        <div class="day-rows">
+          <div class="day-row">
+            <div class="day-ex">Sentadilla con barra</div>
+            <div class="day-target">4×6-10</div>
+            <div class="day-vals">62 kg · 12 / 12 / 10 / 8</div>
           </div>
-          <div class="hm-grid" id="hmGrid"></div>
+          <div class="day-row">
+            <div class="day-ex">Extensión de piernas</div>
+            <div class="day-target">3×12-15</div>
+            <div class="day-vals">77.5 kg · 15 / 15 / 15</div>
+          </div>
         </div>
       </div>
-      <div class="hm-legend">
-        <span>menos</span>
-        <i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i>
-        <span>más</span>
+
+      <div class="day-card">
+        <div class="day-head">
+          <div class="day-date">Jueves, 28 de mayo</div>
+          <div class="day-routine">Día 4 · Piernas</div>
+        </div>
+        <div class="day-rows">
+          <div class="day-row">
+            <div class="day-ex">Prensa atlética</div>
+            <div class="day-target">4×8-12</div>
+            <div class="day-vals">200 kg · 12 / 12 / 12 / 15</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Elevación de gemelos</div>
+            <div class="day-target">3×12-15</div>
+            <div class="day-vals">132.5 kg · 15 / 13 / 14</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Curl de piernas tumbado</div>
+            <div class="day-target">3×12-15</div>
+            <div class="day-vals">75 kg · 15 / 15 / 15</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="day-card">
+        <div class="day-head">
+          <div class="day-date">Lunes, 25 de mayo</div>
+          <div class="day-routine">Día 1 · Pecho · Tríceps</div>
+        </div>
+        <div class="day-rows">
+          <div class="day-row">
+            <div class="day-ex">Press de banca</div>
+            <div class="day-target">4×8-12</div>
+            <div class="day-vals">22.5 kg · 12 / 12 / 12 / 9</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Press inclinado con mancuernas</div>
+            <div class="day-target">4×8-12</div>
+            <div class="day-vals">45 kg · 12 / 12 / 8 / 5</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Aperturas en polea</div>
+            <div class="day-target">3×12-15</div>
+            <div class="day-vals">15 kg · 15 / 15 / 13</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Pressdown de cuerda</div>
+            <div class="day-target">3×12-15</div>
+            <div class="day-vals">23.5 kg · 15 / 15 / 12</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="day-card">
+        <div class="day-head">
+          <div class="day-date">Jueves, 21 de mayo</div>
+          <div class="day-routine">Día 4 · Piernas</div>
+        </div>
+        <div class="day-rows">
+          <div class="day-row">
+            <div class="day-ex">Sentadilla con barra</div>
+            <div class="day-target">4×6-10</div>
+            <div class="day-vals">52.5 kg · 12 / 12 / 12 / 12</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Curl de piernas</div>
+            <div class="day-target">3×12-15</div>
+            <div class="day-vals">72.5 kg · 15 / 15 / 15</div>
+          </div>
+          <div class="day-row">
+            <div class="day-ex">Elevación lateral hombros</div>
+            <div class="day-target">4×8-12</div>
+            <div class="day-vals">41.5 kg · 15 / 15 / 14 / 13</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Pane: Por ejercicio · cajas + chips de progresión (1:1 con la captura) -->
+    <div class="pane" id="paneEx" role="tabpanel">
+
+      <div class="px-eyebrow">
+        <span class="lbl">POR EJERCICIO</span>
+        <span class="sub">chips de progresión</span>
+      </div>
+
+      <!-- Sentadilla con barra -->
+      <div class="ex-box">
+        <div class="ex-box-head">
+          <div>
+            <div class="ex-box-title">Sentadilla con barra</div>
+            <div class="ex-box-meta">Piernas · 2 sesiones</div>
+          </div>
+          <div class="ex-box-trend flat">· 2 ses.</div>
+        </div>
+        <div class="ex-chips">
+          <div class="ex-chip">
+            <div class="ex-chip-date">25.5</div>
+            <div class="ex-chip-weight">20<span class="u">kg</span></div>
+            <div class="ex-chip-reps">6·6·6·6</div>
+            <div class="ex-chip-pos">pos.I</div>
+          </div>
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">1.6</div>
+            <div class="ex-chip-weight">60<span class="u">kg</span></div>
+            <div class="ex-chip-reps">10·10·10·10</div>
+            <div class="ex-chip-pos">pos.I</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Extensión de piernas -->
+      <div class="ex-box">
+        <div class="ex-box-head">
+          <div>
+            <div class="ex-box-title">Extensión de piernas</div>
+            <div class="ex-box-meta">Piernas · 22 sesiones</div>
+          </div>
+          <div class="ex-box-trend">↑ +3.3 kg</div>
+        </div>
+        <div class="ex-chips">
+          <div class="ex-chip">
+            <div class="ex-chip-date">11.5</div>
+            <div class="ex-chip-weight">75<span class="u">kg</span></div>
+            <div class="ex-chip-reps">15·15·15</div>
+            <div class="ex-chip-pos">pos.V</div>
+          </div>
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">18.5</div>
+            <div class="ex-chip-weight">77.5<span class="u">kg</span></div>
+            <div class="ex-chip-reps">15·15·12</div>
+            <div class="ex-chip-pos">pos.III</div>
+          </div>
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">25.5</div>
+            <div class="ex-chip-weight">77.5<span class="u">kg</span></div>
+            <div class="ex-chip-reps">15·15·13</div>
+            <div class="ex-chip-pos">pos.V</div>
+          </div>
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">1.6</div>
+            <div class="ex-chip-weight">77.5<span class="u">kg</span></div>
+            <div class="ex-chip-reps">15·15·15</div>
+            <div class="ex-chip-pos">pos.IV</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prensa de piernas -->
+      <div class="ex-box">
+        <div class="ex-box-head">
+          <div>
+            <div class="ex-box-title">Prensa de piernas</div>
+            <div class="ex-box-meta">Piernas · 1 sesiones</div>
+          </div>
+          <div class="ex-box-trend flat">· 1 ses.</div>
+        </div>
+        <div class="ex-chips">
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">28.5</div>
+            <div class="ex-chip-weight">200<span class="u">kg</span></div>
+            <div class="ex-chip-reps">12·12·12·15</div>
+            <div class="ex-chip-pos">pos.V</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Curl de piernas tumbado -->
+      <div class="ex-box">
+        <div class="ex-box-head">
+          <div>
+            <div class="ex-box-title">Curl de piernas tumbado</div>
+            <div class="ex-box-meta">Piernas · 1 sesiones</div>
+          </div>
+          <div class="ex-box-trend flat">· 1 ses.</div>
+        </div>
+        <div class="ex-chips">
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">28.5</div>
+            <div class="ex-chip-weight">75<span class="u">kg</span></div>
+            <div class="ex-chip-reps">15·15·15</div>
+            <div class="ex-chip-pos">pos.III</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hip thrust -->
+      <div class="ex-box">
+        <div class="ex-box-head">
+          <div>
+            <div class="ex-box-title">Hip thrust</div>
+            <div class="ex-box-meta">Glúteos · 8 sesiones</div>
+          </div>
+          <div class="ex-box-trend">↑ +15 kg</div>
+        </div>
+        <div class="ex-chips">
+          <div class="ex-chip">
+            <div class="ex-chip-date">4.5</div>
+            <div class="ex-chip-weight">125<span class="u">kg</span></div>
+            <div class="ex-chip-reps">12·12·12</div>
+            <div class="ex-chip-pos">pos.II</div>
+          </div>
+          <div class="ex-chip">
+            <div class="ex-chip-date">11.5</div>
+            <div class="ex-chip-weight">130<span class="u">kg</span></div>
+            <div class="ex-chip-reps">12·12·12</div>
+            <div class="ex-chip-pos">pos.II</div>
+          </div>
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">25.5</div>
+            <div class="ex-chip-weight">140<span class="u">kg</span></div>
+            <div class="ex-chip-reps">12·12·12</div>
+            <div class="ex-chip-pos">pos.II</div>
+          </div>
+          <div class="ex-chip pr">
+            <span class="ex-chip-pr-badge">PR</span>
+            <div class="ex-chip-date">1.6</div>
+            <div class="ex-chip-weight">140<span class="u">kg</span></div>
+            <div class="ex-chip-reps">15·15·15</div>
+            <div class="ex-chip-pos">pos.II</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     7 · QA · Logs de dirección y Human-in-the-loop
+     ============================================================ -->
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">QA · Dirección de producto</div>
+    <h2>Logs de dirección · Human-in-the-loop</h2>
+    <p>El modelo propone, yo decido. Casos reales donde corregí al asistente porque la lógica generada era metodológicamente incorrecta o visualmente tosca. <b>Algoritmo de estancamiento dinámico</b> y <b>rediseño de la matriz de frecuencia de 12 semanas (Apple-style heatmap)</b> incluidos.</p>
+  </div>
+
+  <div class="qa-grid">
+    <div class="qa-card">
+      <h3>Estancamiento dinámico <span class="pill">bug lógico</span></h3>
+      <p>
+        El asistente proponía <b>subir el peso por defecto</b> en la próxima sesión aunque el usuario no hubiera cumplido el objetivo. Resultado: sugerencias inseguras tras una sesión floja, riesgo de lesión y de falsos PRs.
+      </p>
+      <p>
+        Reescribí la regla a <b>"double progression estricta"</b> con detección de estancamiento sobre <b>1RM estimado en ventana de 4 semanas</b>: solo sube si TODAS las series del top del rango se cumplen, y nunca baja por inercia.
+      </p>
+      <div class="qa-code">
+<span class="com">// stagnation.js · ventana de 4 semanas</span><br>
+<span class="kw">const</span> recent = sessions.filter(s =&gt; s.date &gt;= cutISO);<br>
+<span class="kw">return</span> bestEstimated1RM(recent) &lt;= bestEstimated1RM(before);
       </div>
     </div>
-  </section>
-</main>
 
-<!-- REST PANEL -->
-<div class="rest-panel" id="restPanel">
-  <div class="rp-ring">
-    <svg viewBox="0 0 64 64">
-      <circle class="rp-bg" cx="32" cy="32" r="27"/>
-      <circle class="rp-fg" cx="32" cy="32" r="27" stroke-dasharray="169.6" stroke-dashoffset="0" id="rpFg"/>
-    </svg>
-    <div class="rp-time" id="rpTime">2:00</div>
+    <div class="qa-card">
+      <h3>Matriz de frecuencia 12 sem. <span class="pill">rediseño UI</span></h3>
+      <p>
+        La matriz original se veía <b>tosca y desalineada</b>: niveles por volumen mezclado, sin etiquetas de día ni mes, semanas no alineadas a lunes. No comunicaba.
+      </p>
+      <p>
+        Apliqué el patrón de los widgets de Apple: <b>12 semanas L→D</b> alineadas a lunes, niveles por <b>nº de ejercicios distintos</b>, opacidades 22 / 45 / 70 / 95 %, etiquetas "L M X J V S D" a la izquierda, meses en el eje superior, leyenda discreta a la derecha.
+      </p>
+      <div class="qa-code">
+<span class="com">// volume.js — adherenceMatrix()</span><br>
+<span class="kw">const</span> lvl = count &lt;= 0 ? 0 : Math.min(4, count);<br>
+<span class="com">// future cells: opacity .4 · pointer-events: none</span>
+      </div>
+    </div>
+
+    <div class="qa-card">
+      <h3>Timer real-clock <span class="pill">PWA hardening</span></h3>
+      <p>
+        El timer de descanso usaba <b>setInterval-as-counter</b>. iOS lo throttlea al bloquear pantalla → al volver, marcaba 2:00 cuando realmente habían pasado 4:00.
+      </p>
+      <p>
+        Reescritura con <b>timestamp objetivo</b> (<b>endAt</b>) y recálculo desde Date.now() en cada tick + visibilitychange. Sobrevive al bloqueo de pantalla entre series.
+      </p>
+      <div class="qa-code">
+this.endAt = Date.now() + seconds * 1000;<br>
+this.remaining = Math.round((this.endAt - Date.now()) / 1000);
+      </div>
+    </div>
+
+    <div class="qa-card">
+      <h3>Service Worker <span class="pill">deploy trap</span></h3>
+      <p>
+        Cache-first sobre el HTML dejaba a los usuarios congelados en una versión instalada en pantalla de inicio: un deploy nuevo NO llegaba nunca.
+      </p>
+      <p>
+        Reescribí la estrategia: <b>network-first</b> para HTML, <b>stale-while-revalidate</b> para JS/CSS, y el propio <b>sw.js NUNCA se intercepta</b>. Toast de "nueva versión — recarga" sin auto-reload (no interrumpir una serie).
+      </p>
+      <div class="qa-code">
+<span class="kw">if</span> (url.pathname.endsWith('/sw.js')) <span class="kw">return</span>; <span class="com">// nunca cachear</span><br>
+<span class="kw">if</span> (isNav) <span class="kw">return</span> networkFirst(req);
+      </div>
+    </div>
   </div>
-  <div class="rp-info">
-    <div class="rp-name" id="rpName">Descanso</div>
-    <div class="rp-sub" id="rpSub">—</div>
-  </div>
-  <div class="rp-actions">
-    <button id="rpMinus" title="-15s">−15</button>
-    <button id="rpPlus"  title="+15s">+15</button>
-    <button class="close" id="rpStop" title="Detener">×</button>
-  </div>
-</div>
+</section>
 
-<!-- ENTRENAMIENTO ACTIVO (player a pantalla completa, Fase I) -->
-<div class="aw-overlay" id="activeWorkout" aria-hidden="true"></div>
+<!-- ============================================================
+     8 · FOOTER
+     ============================================================ -->
+<footer>
+  <p class="credit">
+    <b>Designed &amp; Orchestrated by Lukas Kopecky</b> &nbsp;|&nbsp;
+    Built in Cooperation with <span class="ai">Claude Agent v3.5</span>
+  </p>
+  <p class="meta">
+    Vanilla JS · 0 dependencies · 0 npm · 0 build step · 100% local-first
+  </p>
+</footer>
 
-<nav class="tabs">
-  <button data-tab="inicio" class="active"><span class="ico">⌂</span><span>Rutina</span></button>
-  <button data-tab="historial"><span class="ico">≡</span><span>Historial</span></button>
-  <button data-tab="progreso"><span class="ico">↗</span><span>Progreso</span></button>
-  <button data-tab="analisis"><span class="ico">◫</span><span>Análisis</span></button>
-</nav>
+<script>
+(function(){
+  'use strict';
 
-<div class="toast" id="toast"></div>
+  /* ============================================================
+     Cronómetro HH:MM:SS · arranca al cargar
+     ============================================================ */
+  const startMs = Date.now();
+  const elapsedEl = document.getElementById('elapsed');
+  const pad = n => String(n).padStart(2, '0');
 
-<div class="modal-bg" id="modalBg">
-  <div class="modal" id="modal"></div>
-</div>
+  function tickElapsed() {
+    const s = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    elapsedEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(sec);
+  }
+  tickElapsed();
+  setInterval(tickElapsed, 1000);
 
-<!-- Globals: Chart.js + Dexie (IndexedDB). Cargan antes que main.js para
-     que estén disponibles cuando importemos módulos que los usan. -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.7/dist/dexie.min.js"></script>
-<!-- Entry point modular -->
-<script type="module" src="./js/main.js"></script>
+  /* ============================================================
+     Stepper de repeticiones · snap-to-12 + under-range warning
+     ============================================================ */
+  const TARGET_MIN = 12;
+  const setEl  = document.getElementById('set1');
+  const valEl  = document.getElementById('repsVal');
+  const incBtn = document.getElementById('repsInc');
+  const decBtn = document.getElementById('repsDec');
+  const saveBtn = document.getElementById('saveBtn');
+
+  let reps = null;  // null = sin tocar todavía → display "—"
+
+  function refresh() {
+    valEl.textContent = (reps === null) ? '—' : String(reps);
+    const under = (reps !== null && reps < TARGET_MIN);
+    setEl.classList.toggle('under', under);
+  }
+
+  function bump(delta) {
+    if (reps === null) {
+      // Primer toque: salta al límite inferior del rango (12), no a 0+/-1.
+      reps = TARGET_MIN;
+    } else {
+      reps = Math.max(1, reps + delta);
+    }
+    // Si vuelve a tocar después de guardar, reseteamos el estado visual del save
+    saveBtn.classList.remove('saved');
+    saveBtn.textContent = 'Guardar Serie / Confirmar Set';
+    setEl.classList.remove('saved');
+    refresh();
+  }
+
+  incBtn.addEventListener('click', function(){ bump(+1); });
+  decBtn.addEventListener('click', function(){ bump(-1); });
+
+  /* ============================================================
+     RPE slider · feedback de coach
+     ============================================================ */
+  const RPE_DESC = {
+    1: 'Trivial. Esfuerzo despreciable.',
+    2: 'Calentamiento. Sin estímulo real.',
+    3: 'Activación. 7+ repeticiones en reserva.',
+    4: 'Esfuerzo bajo. 6 repeticiones en reserva.',
+    5: 'Moderado. 5 repeticiones en reserva.',
+    6: 'Significativo. 4 repeticiones en reserva.',
+    7: 'Duro. 3 repeticiones en reserva.',
+    8: '2 repeticiones en reserva. Esfuerzo alto, técnica controlada.',
+    9: '1 repetición en reserva. Al límite técnico.',
+   10: 'Fallo muscular. 0 repeticiones en reserva.'
+  };
+
+  const slider  = document.getElementById('rpeSlider');
+  const rpeVal  = document.getElementById('rpeVal');
+  const rpeDesc = document.getElementById('rpeDesc');
+
+  function refreshRpe() {
+    const v = parseInt(slider.value, 10);
+    rpeVal.textContent = v;
+    const pct = ((v - 1) / 9) * 100;
+    slider.style.setProperty('--pct', pct + '%');
+    rpeDesc.innerHTML = 'RPE ' + v + ' · <b>' + RPE_DESC[v] + '</b>';
+  }
+  slider.addEventListener('input', refreshRpe);
+  refreshRpe();
+
+  /* ============================================================
+     CELEBRACIÓN PR · confeti + banner emergente
+     ------------------------------------------------------------
+     Disparado por el botón "Guardar Serie / Confirmar Set".
+     Reglas:
+       - reps == null  → snap a 12 y guardar (cuenta como objetivo).
+       - reps >= 12    → PR (entras dentro o por encima del rango).
+       - reps <  12    → solo guardar, sin celebración.
+     ============================================================ */
+  const confettiHost = document.getElementById('confettiHost');
+  const prBanner     = document.getElementById('prBanner');
+  const CONFETTI_COLORS = [
+    '#ff6b00', '#ffa45c', '#34d399', '#fbbf24',
+    '#60a5fa', '#f472b6', '#a78bfa'
+  ];
+
+  function spawnConfetti(n) {
+    n = n || 42;
+    // Medimos el ancho real del host AHORA — así las posiciones son píxeles
+    // absolutos dentro del player, no porcentajes del propio confeti.
+    const hostW = confettiHost.offsetWidth || 470;
+    for (let i = 0; i < n; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+
+      const x0px = Math.random() * hostW;            // posición inicial (px)
+      const xfpx = Math.random() * hostW;            // posición final (px)
+      const dx   = (xfpx - x0px).toFixed(1) + 'px';  // desplazamiento lateral
+      const rot  = Math.round(Math.random() * 720 - 360) + 'deg';
+      const dur  = (1.4 + Math.random() * 1.0).toFixed(2) + 's';
+      const del  = (Math.random() * 0.35).toFixed(2) + 's';
+      const col  = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+      const w    = (6 + Math.random() * 5).toFixed(1) + 'px';
+      const h    = (10 + Math.random() * 8).toFixed(1) + 'px';
+
+      piece.style.setProperty('--dx',  dx);
+      piece.style.setProperty('--rot', rot);
+      piece.style.setProperty('--dur', dur);
+      piece.style.setProperty('--delay', del);
+      piece.style.background = col;
+      piece.style.left   = x0px.toFixed(1) + 'px';
+      piece.style.width  = w;
+      piece.style.height = h;
+
+      confettiHost.appendChild(piece);
+      // Limpia el DOM tras la animación para no acumular nodos.
+      setTimeout(function(){ piece.remove(); }, 2800);
+    }
+  }
+
+  function showPrBanner() {
+    prBanner.classList.add('show');
+    clearTimeout(showPrBanner._t);
+    showPrBanner._t = setTimeout(function(){
+      prBanner.classList.remove('show');
+    }, 2800);
+  }
+
+  function celebratePR() {
+    spawnConfetti(48);
+    showPrBanner();
+  }
+
+  saveBtn.addEventListener('click', function(){
+    // Si el usuario no tocó el stepper, asumimos que cumplió el objetivo
+    // mínimo (snap-to-12) y disparamos PR igualmente — es el comportamiento
+    // real del player cuando "Cíl: 12-15" y el usuario confirma sin tocar.
+    if (reps === null) {
+      reps = TARGET_MIN;
+      refresh();
+    }
+
+    setEl.classList.add('saved');
+    saveBtn.classList.add('saved');
+    saveBtn.textContent = '✓ Serie guardada · 60 kg';
+
+    if (reps >= TARGET_MIN) {
+      celebratePR();
+    }
+  });
+
+  /* ============================================================
+     Tab bar del Historial
+     ============================================================ */
+  const tabs  = document.querySelectorAll('.ht-tab');
+  const panes = document.querySelectorAll('.pane');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click', function(){
+      const target = tab.dataset.pane;
+      tabs.forEach(function(t){ t.classList.toggle('on', t === tab); });
+      panes.forEach(function(p){ p.classList.toggle('on', p.id === target); });
+    });
+  });
+
+  /* ============================================================
+     MÓDULO · Progreso por ejercicio (charts SVG nativos)
+     ------------------------------------------------------------
+     - PG_DATA: dataset por ejercicio (KPIs + 2 series temporales).
+     - renderLineChart(): construye SVG (grid, ejes, área, línea,
+       puntos) desde cero, sin Chart.js. viewBox fijo + width:100%
+       → responsive automático.
+     - renderProgress(): repinta KPIs y ambos charts al cambiar.
+     ============================================================ */
+  const PG_DATA = {
+    lat: {
+      name: 'Tirón de Lat inclinado',
+      last: '65', pr: '65', oneRm: '140', pos: 'I',
+      strength: { yMin: 50, yMax: 66, yStep: 4, pts: [
+        ['24.11',52.5],['1.12',52.5],['8.12',50],['15.12',50],
+        ['22.12',52.5],['29.12',52.5],['5.1',55],['12.1',57],
+        ['19.1',55],['26.1',55],['2.2',53],['10.2',53],
+        ['17.2',55],['24.2',55],['3.3',55],['10.3',60],
+        ['17.3',60],['24.3',60],['31.3',62],['14.4',62],
+        ['28.4',62],['12.5',65],['26.5',65]
+      ]},
+      volume:   { yMin: 1000, yMax: 5000, yStep: 1000, pts: [
+        ['24.11',1900],['1.12',2050],['8.12',4600],['15.12',2200],
+        ['22.12',2400],['29.12',2500],['5.1',2500],['12.1',2800],
+        ['19.1',2400],['26.1',2450],['2.2',2400],['10.2',1900],
+        ['17.2',2400],['24.2',2500],['3.3',2850],['10.3',1950],
+        ['17.3',2400],['24.3',2700],['31.3',2750],['14.4',2750],
+        ['28.4',2800],['12.5',2900],['26.5',2900]
+      ]}
+    },
+    squat: {
+      name: 'Sentadilla con barra',
+      last: '62.5', pr: '60', oneRm: '78', pos: 'III',
+      strength: { yMin: 30, yMax: 65, yStep: 5, pts: [
+        ['1.1',30],['8.1',32.5],['15.1',32.5],['22.1',35],
+        ['29.1',37.5],['5.2',40],['12.2',42.5],['19.2',42.5],
+        ['26.2',45],['5.3',47.5],['12.3',50],['19.3',50],
+        ['26.3',52.5],['2.4',55],['9.4',55],['16.4',57.5],
+        ['23.4',57.5],['30.4',60],['7.5',60],['14.5',62.5],
+        ['21.5',62.5],['28.5',62.5]
+      ]},
+      volume:   { yMin: 1500, yMax: 4000, yStep: 500, pts: [
+        ['1.1',1800],['8.1',2100],['15.1',2150],['22.1',2350],
+        ['29.1',2500],['5.2',2650],['12.2',2750],['19.2',2700],
+        ['26.2',2900],['5.3',3050],['12.3',3200],['19.3',3100],
+        ['26.3',3300],['2.4',3500],['9.4',3450],['16.4',3650],
+        ['23.4',3550],['30.4',3800],['7.5',3700],['14.5',3900],
+        ['21.5',3850],['28.5',3950]
+      ]}
+    },
+    bench: {
+      name: 'Press de banca',
+      last: '22.5', pr: '27.5', oneRm: '36', pos: 'I',
+      strength: { yMin: 20, yMax: 30, yStep: 2, pts: [
+        ['1.1',22.5],['8.1',22.5],['15.1',25],['22.1',25],
+        ['29.1',27.5],['5.2',27.5],['12.2',27.5],['19.2',25],
+        ['26.2',25],['5.3',27.5],['12.3',27.5],['19.3',25],
+        ['26.3',25],['2.4',25],['9.4',25],['16.4',22.5],
+        ['23.4',22.5],['30.4',22.5],['7.5',22.5],['14.5',22.5],
+        ['21.5',22.5],['28.5',22.5]
+      ]},
+      volume:   { yMin: 600, yMax: 1400, yStep: 200, pts: [
+        ['1.1',900],['8.1',920],['15.1',1050],['22.1',1100],
+        ['29.1',1180],['5.2',1200],['12.2',1220],['19.2',1050],
+        ['26.2',1080],['5.3',1180],['12.3',1150],['19.3',1020],
+        ['26.3',1000],['2.4',1010],['9.4',990],['16.4',900],
+        ['23.4',880],['30.4',850],['7.5',830],['14.5',820],
+        ['21.5',810],['28.5',800]
+      ]}
+    },
+    hip: {
+      name: 'Hip thrust',
+      last: '140', pr: '150', oneRm: '187', pos: 'II',
+      strength: { yMin: 70, yMax: 155, yStep: 15, pts: [
+        ['1.1',80],['8.1',85],['15.1',90],['22.1',100],
+        ['29.1',105],['5.2',110],['12.2',115],['19.2',115],
+        ['26.2',120],['5.3',120],['12.3',125],['19.3',125],
+        ['26.3',130],['2.4',130],['9.4',135],['16.4',135],
+        ['23.4',140],['30.4',140],['7.5',140],['14.5',145],
+        ['21.5',150],['28.5',140]
+      ]},
+      volume:   { yMin: 2000, yMax: 6500, yStep: 1000, pts: [
+        ['1.1',2400],['8.1',2700],['15.1',2900],['22.1',3200],
+        ['29.1',3450],['5.2',3700],['12.2',3900],['19.2',3850],
+        ['26.2',4100],['5.3',4150],['12.3',4400],['19.3',4350],
+        ['26.3',4650],['2.4',4700],['9.4',4900],['16.4',4900],
+        ['23.4',5200],['30.4',5300],['7.5',5350],['14.5',5500],
+        ['21.5',5800],['28.5',5400]
+      ]}
+    }
+  };
+
+  function fmtAxis(v) {
+    if (v >= 1000) return v.toLocaleString('en-US'); // "5,000" como en la app
+    if (v % 1 !== 0) return v.toFixed(1);
+    return String(v);
+  }
+
+  function renderLineChart(host, ds, variant) {
+    if (!host) return;
+    const W = 720, H = 240;
+    const padL = 50, padR = 16, padT = 18, padB = 36;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+
+    const pts = ds.pts;
+    const yMin = ds.yMin, yMax = ds.yMax, yStep = ds.yStep;
+    const n = pts.length;
+    const xOf = i => padL + (i / Math.max(1, n - 1)) * chartW;
+    const yOf = v => padT + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
+
+    // Grid horizontal + etiquetas Y
+    let yMarks = '';
+    for (let v = yMin; v <= yMax + 0.0001; v += yStep) {
+      const y = yOf(v).toFixed(1);
+      yMarks += '<line class="pg-grid" x1="' + padL + '" y1="' + y +
+                '" x2="' + (W - padR) + '" y2="' + y + '"/>';
+      yMarks += '<text class="pg-axis" x="' + (padL - 10) + '" y="' + (parseFloat(y) + 4).toFixed(1) +
+                '" text-anchor="end">' + fmtAxis(v) + '</text>';
+    }
+
+    // Etiquetas X (~8 separadas + última)
+    let xMarks = '';
+    const stride = Math.max(1, Math.floor((n - 1) / 7));
+    const shown = new Set();
+    for (let i = 0; i < n; i += stride) {
+      shown.add(i);
+      xMarks += '<text class="pg-axis" x="' + xOf(i).toFixed(1) + '" y="' + (H - padB + 20) +
+                '" text-anchor="middle">' + pts[i][0] + '</text>';
+    }
+    if (!shown.has(n - 1)) {
+      xMarks += '<text class="pg-axis" x="' + xOf(n - 1).toFixed(1) + '" y="' + (H - padB + 20) +
+                '" text-anchor="middle">' + pts[n-1][0] + '</text>';
+    }
+
+    // Línea + área
+    const lineD = pts.map((p, i) =>
+      (i === 0 ? 'M' : 'L') + xOf(i).toFixed(1) + ',' + yOf(p[1]).toFixed(1)
+    ).join(' ');
+    const areaD = lineD +
+      ' L' + xOf(n - 1).toFixed(1) + ',' + (padT + chartH).toFixed(1) +
+      ' L' + xOf(0).toFixed(1)     + ',' + (padT + chartH).toFixed(1) + ' Z';
+
+    // Puntos visibles
+    const dotCls = 'pg-dot' + (variant === 'soft' ? ' soft' : '');
+    const dots = pts.map((p, i) =>
+      '<circle class="' + dotCls + '" cx="' + xOf(i).toFixed(1) +
+      '" cy="' + yOf(p[1]).toFixed(1) + '" r="3"/>'
+    ).join('');
+
+    // Hit areas transparentes (r=14) para que el dedo agarre el dot.
+    // Renderizadas al FINAL para estar por encima del resto en el orden Z del SVG.
+    const unitTxt = variant === 'soft' ? 'kg·reps' : 'kg';
+    const hits = pts.map((p, i) =>
+      '<circle class="pg-hit" cx="' + xOf(i).toFixed(1) +
+      '" cy="' + yOf(p[1]).toFixed(1) + '" r="14" tabindex="0" ' +
+      'data-date="' + p[0] + '" data-val="' + p[1] +
+      '" data-unit="' + unitTxt + '" data-idx="' + i + '"/>'
+    ).join('');
+
+    const gradId = 'pgGrad-' + Math.random().toString(36).slice(2, 8);
+    const colorHex = variant === 'soft' ? '#ffa45c' : '#ff6b00';
+    const fillOp   = variant === 'soft' ? '0.28' : '0.34';
+    const lineCls  = 'pg-line' + (variant === 'soft' ? ' soft' : '');
+
+    host.innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pg-svg" ' +
+        'preserveAspectRatio="xMidYMid meet" role="img" ' +
+        'aria-label="Gráfico de progreso">' +
+        '<defs>' +
+          '<linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0%" stop-color="' + colorHex + '" stop-opacity="' + fillOp + '"/>' +
+            '<stop offset="100%" stop-color="' + colorHex + '" stop-opacity="0"/>' +
+          '</linearGradient>' +
+        '</defs>' +
+        yMarks + xMarks +
+        '<path d="' + areaD + '" fill="url(#' + gradId + ')"/>' +
+        '<path class="' + lineCls + '" d="' + lineD + '"/>' +
+        dots + hits +
+      '</svg>';
+  }
+
+  /* ------------------------------------------------------------
+     Tooltip global: aparece sobre el punto tocado, muestra
+     fecha + valor con unidad. Auto-hide a los 2.8s + cierre al
+     tocar fuera. Si el punto está cerca del borde superior, el
+     tooltip se voltea para mostrarse debajo.
+     ------------------------------------------------------------ */
+  function pgFormatVal(val, unit) {
+    const n = parseFloat(val);
+    let s;
+    if (n >= 1000) s = Math.round(n).toLocaleString('en-US');
+    else if (n % 1 !== 0) s = n.toFixed(1);
+    else s = String(n);
+    return s + ' <em>' + unit + '</em>';
+  }
+
+  function pgShowTip(hit) {
+    const card = hit.closest('.pg-chart-card');
+    if (!card) return;
+    let tip = card.querySelector('.pg-tip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'pg-tip';
+      card.appendChild(tip);
+    }
+
+    const cardRect = card.getBoundingClientRect();
+    const hitRect  = hit.getBoundingClientRect();
+    const x = hitRect.left + hitRect.width  / 2 - cardRect.left;
+    const y = hitRect.top  + hitRect.height / 2 - cardRect.top;
+
+    tip.innerHTML =
+      '<span class="d">' + hit.dataset.date + '</span>' +
+      '<span class="v">' + pgFormatVal(hit.dataset.val, hit.dataset.unit) + '</span>';
+
+    tip.style.left = x.toFixed(1) + 'px';
+    tip.style.top  = y.toFixed(1) + 'px';
+
+    // Si el punto está pegado arriba, voltea el tooltip debajo.
+    tip.classList.toggle('below', y < 56);
+
+    // Resalta el dot correspondiente.
+    pgClearActiveDots(card);
+    const idx = hit.dataset.idx;
+    const dotList = card.querySelectorAll('.pg-dot');
+    if (dotList[idx]) dotList[idx].classList.add('active');
+
+    // Trigger transición tras pintar.
+    requestAnimationFrame(function(){ tip.classList.add('show'); });
+
+    clearTimeout(pgShowTip._t);
+    pgShowTip._t = setTimeout(function(){ pgHideTips(); }, 2800);
+  }
+
+  function pgClearActiveDots(card) {
+    card.querySelectorAll('.pg-dot.active').forEach(function(d){
+      d.classList.remove('active');
+    });
+  }
+
+  function pgHideTips() {
+    document.querySelectorAll('.pg-tip.show').forEach(function(t){
+      t.classList.remove('show');
+    });
+    document.querySelectorAll('.pg-chart-card').forEach(pgClearActiveDots);
+  }
+
+  // Delegación: cualquier click/touch en una hit area dispara el tooltip.
+  document.addEventListener('click', function(e){
+    const hit = e.target.closest && e.target.closest('.pg-hit');
+    if (hit) {
+      e.stopPropagation();
+      pgShowTip(hit);
+    } else if (!e.target.closest('.pg-tip')) {
+      pgHideTips();
+    }
+  });
+  // Accesibilidad teclado: foco + Enter/Space sobre el hit.
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const hit = document.activeElement;
+    if (hit && hit.classList && hit.classList.contains('pg-hit')) {
+      e.preventDefault();
+      pgShowTip(hit);
+    }
+  });
+
+  function renderProgress(key) {
+    const d = PG_DATA[key];
+    if (!d) return;
+    document.getElementById('pgLast').innerHTML = d.last + '<span class="u"> kg</span>';
+    document.getElementById('pgPr').innerHTML   = d.pr   + '<span class="u"> kg</span>';
+    document.getElementById('pg1rm').innerHTML  = d.oneRm + '<span class="u"> kg</span>';
+    document.getElementById('pgPos').textContent = d.pos;
+    renderLineChart(document.getElementById('pgChartStrength'), d.strength, 'strong');
+    renderLineChart(document.getElementById('pgChartVolume'),   d.volume,   'soft');
+  }
+
+  const pgPicker = document.getElementById('pgPicker');
+  if (pgPicker) {
+    pgPicker.addEventListener('change', function(){ renderProgress(pgPicker.value); });
+    renderProgress(pgPicker.value || 'lat');
+  }
+
+  /* ============================================================
+     MÓDULO INTERACTIVO · Arquitectura de Rutinas
+     ------------------------------------------------------------
+     Estado local en memoria (espejo del modelo real de la PWA,
+     que persiste en IndexedDB vía Dexie). Cada interacción
+     re-renderiza el árbol completo desde el estado.
+     ============================================================ */
+
+  // Biblioteca de ejercicios disponibles para añadir.
+  const EXERCISE_LIBRARY = [
+    { name: 'Sentadilla con barra',         group: 'Piernas',  sets: 4 },
+    { name: 'Press de banca',               group: 'Pecho',    sets: 4 },
+    { name: 'Dominadas',                    group: 'Espalda',  sets: 4 },
+    { name: 'Press militar con barra',      group: 'Hombros',  sets: 4 },
+    { name: 'Peso muerto rumano',           group: 'Isquios',  sets: 4 },
+    { name: 'Remo con barra',               group: 'Espalda',  sets: 4 },
+    { name: 'Curl con barra',               group: 'Bíceps',   sets: 3 },
+    { name: 'Press francés',                group: 'Tríceps',  sets: 3 },
+    { name: 'Hip thrust',                   group: 'Glúteos',  sets: 4 },
+    { name: 'Elevación lateral',            group: 'Hombros',  sets: 3 },
+    { name: 'Prensa atlética',              group: 'Piernas',  sets: 4 },
+    { name: 'Curl femoral tumbado',         group: 'Isquios',  sets: 3 }
+  ];
+
+  // Estado inicial: 3 días preconfigurados (alineados con el copy de la sección).
+  let nextDayId = 4;
+  const days = [
+    {
+      id: 1,
+      name: 'Lunes · Pierna / Hombro',
+      subtitle: 'Cuádriceps · Glúteo · Deltoides',
+      addingExercise: false,
+      exercises: [
+        { name: 'Sentadilla con barra',     sets: 4 },
+        { name: 'Hip thrust',               sets: 4 },
+        { name: 'Press militar con barra',  sets: 4 }
+      ]
+    },
+    {
+      id: 2,
+      name: 'Martes · Brazos / Hombro',
+      subtitle: 'Bíceps · Tríceps · Deltoides',
+      addingExercise: false,
+      exercises: [
+        { name: 'Curl con barra',     sets: 3 },
+        { name: 'Press francés',      sets: 3 },
+        { name: 'Elevación lateral',  sets: 3 }
+      ]
+    },
+    {
+      id: 3,
+      name: 'Jueves · Piernas',
+      subtitle: 'Posterior · Femoral · Gemelo',
+      addingExercise: false,
+      exercises: [
+        { name: 'Peso muerto rumano',  sets: 4 },
+        { name: 'Curl femoral tumbado',sets: 3 }
+      ]
+    }
+  ];
+
+  // Modo "añadir día" (input inline)
+  let isAddingDay = false;
+
+  const rbList    = document.getElementById('rbList');
+  const rbAddDay  = document.getElementById('rbAddDay');
+
+  // Helper: escapa HTML básico para evitar XSS si el usuario tipea < o >.
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function dayCountLabel(d) {
+    const n = d.exercises.length;
+    if (n === 0) return '0 ejercicios';
+    if (n === 1) return '1 ejercicio';
+    return n + ' ejercicios';
+  }
+
+  function render() {
+    rbList.innerHTML = '';
+
+    days.forEach(function(day){
+      const wrap = document.createElement('div');
+      wrap.className = 'rb-day';
+      wrap.dataset.id = day.id;
+
+      // Cabecera
+      const head = document.createElement('div');
+      head.className = 'rb-day-head';
+      head.innerHTML =
+        '<div>' +
+          '<div class="rb-day-title">' + esc(day.name) + '</div>' +
+          '<div class="rb-day-sub">' + esc(day.subtitle) + '</div>' +
+        '</div>' +
+        '<span class="rb-day-count">' + dayCountLabel(day) + '</span>';
+      wrap.appendChild(head);
+
+      // Lista de ejercicios
+      const exs = document.createElement('div');
+      exs.className = 'rb-exs';
+      if (day.exercises.length === 0) {
+        exs.innerHTML = '<div class="rb-empty">Sin ejercicios todavía · añade uno desde el selector ↓</div>';
+      } else {
+        day.exercises.forEach(function(ex){
+          const row = document.createElement('div');
+          row.className = 'rb-ex';
+          row.innerHTML =
+            '<span class="rb-ex-name">' + esc(ex.name) + '</span>' +
+            '<span class="rb-ex-sets">' + ex.sets + ' series objetivo</span>';
+          exs.appendChild(row);
+        });
+      }
+      wrap.appendChild(exs);
+
+      // Footer · botón "+ Añadir ejercicio" o el selector inline
+      const foot = document.createElement('div');
+      foot.className = 'rb-day-foot';
+
+      if (!day.addingExercise) {
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'rb-add-ex';
+        addBtn.textContent = '+ Añadir ejercicio';
+        addBtn.addEventListener('click', function(){
+          day.addingExercise = true;
+          render();
+        });
+        foot.appendChild(addBtn);
+      } else {
+        const sel = document.createElement('select');
+        sel.className = 'rb-picker';
+        sel.innerHTML = '<option value="" disabled selected>Selecciona un ejercicio…</option>' +
+          EXERCISE_LIBRARY.map(function(ex, i){
+            return '<option value="' + i + '">' + esc(ex.name) + ' · ' + esc(ex.group) + '</option>';
+          }).join('');
+        sel.addEventListener('change', function(){
+          const idx = parseInt(sel.value, 10);
+          if (!isNaN(idx) && EXERCISE_LIBRARY[idx]) {
+            const ex = EXERCISE_LIBRARY[idx];
+            day.exercises.push({ name: ex.name, sets: ex.sets });
+            day.addingExercise = false;
+            render();
+          }
+        });
+        foot.appendChild(sel);
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'rb-cancel';
+        cancel.setAttribute('aria-label', 'Cancelar');
+        cancel.textContent = '×';
+        cancel.addEventListener('click', function(){
+          day.addingExercise = false;
+          render();
+        });
+        foot.appendChild(cancel);
+      }
+      wrap.appendChild(foot);
+
+      rbList.appendChild(wrap);
+    });
+
+    // Modo "añadir día" → fila inline al final
+    let newDayRow = document.getElementById('rbNewDayRow');
+    if (newDayRow) newDayRow.remove();
+
+    if (isAddingDay) {
+      newDayRow = document.createElement('div');
+      newDayRow.id = 'rbNewDayRow';
+      newDayRow.className = 'rb-new-day-row';
+      newDayRow.innerHTML =
+        '<input type="text" id="rbNewDayInput" placeholder="Nombre del día (ej. Viernes · Pecho)" maxlength="60">' +
+        '<button type="button" id="rbConfirmDay">Añadir</button>' +
+        '<button type="button" class="rb-cancel" id="rbCancelDay" aria-label="Cancelar">×</button>';
+      rbAddDay.before(newDayRow);
+
+      const input   = document.getElementById('rbNewDayInput');
+      const confirm = document.getElementById('rbConfirmDay');
+      const cancel  = document.getElementById('rbCancelDay');
+
+      setTimeout(function(){ input.focus(); }, 30);
+
+      function commit() {
+        const raw = input.value.trim();
+        const name = raw || ('Día ' + (days.length + 1));
+        days.push({
+          id: nextDayId++,
+          name: name,
+          subtitle: 'Configura los grupos musculares',
+          addingExercise: false,
+          exercises: []
+        });
+        isAddingDay = false;
+        rbAddDay.textContent = '+ Añadir Día';
+        render();
+      }
+      function abort() {
+        isAddingDay = false;
+        rbAddDay.textContent = '+ Añadir Día';
+        render();
+      }
+
+      confirm.addEventListener('click', commit);
+      cancel.addEventListener('click', abort);
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); abort(); }
+      });
+
+      rbAddDay.textContent = 'Cancelar';
+    } else {
+      rbAddDay.textContent = '+ Añadir Día';
+    }
+  }
+
+  rbAddDay.addEventListener('click', function(){
+    isAddingDay = !isAddingDay;
+    render();
+  });
+
+  render();
+
+})();
+</script>
 </body>
 </html>
