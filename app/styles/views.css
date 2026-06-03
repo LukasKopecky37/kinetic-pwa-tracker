@@ -317,9 +317,12 @@
 }
 .bit-rows{ display:flex; flex-direction:column; gap:6px; }
 .bit-row{
-  display:grid; grid-template-columns:1fr auto 1fr;
+  /* minmax(0, 1fr) en vez de 1fr: sin el min-content de 0, el grid se niega
+     a encoger las columnas por debajo del ancho intrínseco del contenido y
+     el ellipsis no se aplica correctamente dentro del grid track. */
+  display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
   gap:8px; align-items:baseline;
-  padding:5px 0; cursor:pointer;
+  padding:6px 0; cursor:pointer;
   border-bottom:1px dashed transparent;
   transition:background .12s;
 }
@@ -328,6 +331,7 @@
 .bit-name{
   font-size:13px; font-weight:600; color:var(--text);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  min-width:0;  /* requerido para que ellipsis funcione dentro del grid */
 }
 .bit-target{
   font-size:10px; color:var(--muted);
@@ -340,7 +344,17 @@
   font-size:12px; color:var(--accent-2);
   font-variant-numeric:tabular-nums;
   text-align:right;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  /* === Las repeticiones NUNCA se ocultan tras "..." ===
+     Si el string de series es más ancho que su columna, hace wrap elegante
+     a una 2.ª línea (alineada a la derecha igual). Apple HIG: la información
+     crítica del workout debe ser visible sin tap extra.
+     - overflow-wrap:break-word → corta en separadores naturales (espacio, /, ·)
+     - hyphens:none → sin guiones forzados a media palabra (estamos con números)
+     - line-height:1.5 → respiración cuando hay 2 líneas */
+  white-space:normal;
+  overflow-wrap:break-word;
+  hyphens:none;
+  line-height:1.5;
 }
 .bit-more{
   width:100%; margin:8px 0 16px;

@@ -133,14 +133,18 @@ function buildBitacoraRow(sess, routine) {
 }
 
 /** "62 kg · 12 / 12 / 10 / 8" si todas las series comparten peso; si varían,
- *  "62×12 · 60×10 · 50×8". Sin warm-ups. */
+ *  "62×12 · 60×10 · 50×8". Sin warm-ups.
+ *
+ *  Nota tipográfica: usamos NBSP ( ) entre número y unidad para que el
+ *  wrap CSS nunca separe "210" de "kg" en líneas distintas. Los separadores
+ *  " · " y " / " quedan con espacios normales = puntos de ruptura preferidos. */
 function fmtSetsBitacora(sets) {
   const valid = (sets || []).filter(s => !s.warmup && s.reps);
   if (!valid.length) return '—';
   const w0 = valid[0].weight;
   const same = valid.every(s => s.weight === w0);
   return same
-    ? `${w0} kg · ${valid.map(s => s.reps).join(' / ')}`
+    ? `${w0} kg · ${valid.map(s => s.reps).join(' / ')}`
     : valid.map(s => `${s.weight}×${s.reps}`).join(' · ');
 }
 
