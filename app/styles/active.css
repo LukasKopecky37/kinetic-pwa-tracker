@@ -185,6 +185,74 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-set.is-completed .aw-stepper { opacity: .65; }
 .aw-set.is-completed .aw-stepper .aw-step-val { color: var(--good); }
 
+/* ===========================================================================
+   Stepper INLINE de KG · [−] [input] [+]
+   ---------------------------------------------------------------------------
+   El input mantiene su edición manual (tap en el centro → teclado decimal),
+   pero las flechas laterales permiten ±2.5 kg sin desplegar el teclado.
+   Visual: un solo bordeado exterior, buttons borderless por dentro → se ve
+   como UN componente, no como tres elementos sueltos.
+   ============================================================================ */
+.aw-w-stepper {
+  display: flex; align-items: stretch;
+  width: 100%; min-width: 0;
+  background: var(--neutral-bg);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color .15s, background .15s;
+}
+.aw-w-stepper:focus-within {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+.aw-set.next .aw-w-stepper { border-color: var(--accent); }
+
+/* El input pierde su borde/bg propio porque ahora vive DENTRO del wrapper.
+   Padding lateral 0 para dejar todo el ancho disponible al texto numérico. */
+.aw-w-stepper .aw-in {
+  flex: 1; min-width: 0;
+  padding: 12px 0;
+  font-size: 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.aw-w-stepper .aw-in:focus {
+  background: transparent;
+  border-color: transparent;
+}
+
+.aw-w-step {
+  /* 22px ancho — encaja en columna KG (1fr ~ 72px en iPhone 14 Pro) dejando
+     ~28px para el input. Tappable en gym a pesar de su tamaño compacto. */
+  width: 22px; min-width: 22px;
+  background: transparent;
+  border: 0;
+  color: var(--accent-2);
+  font-size: 15px; font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .12s, color .12s, transform .1s;
+}
+.aw-w-step:hover { color: var(--accent); }
+.aw-w-step:active {
+  background: rgba(255,107,0,.18);
+  transform: scale(.88);
+}
+.aw-w-step:disabled { opacity: .35; cursor: default; }
+
+/* Serie completada: stepper bloqueado igual que el input — no quiero
+   subir/bajar peso de una serie ya cerrada. */
+.aw-set.is-completed .aw-w-stepper { opacity: .65; }
+.aw-set.is-completed .aw-w-step { pointer-events: none; opacity: .5; }
+
 /* Aviso sub-rango: borde naranja sutil cuando reps < límite inferior */
 .aw-set.is-under{
   border-color: rgba(255,122,47,.55);

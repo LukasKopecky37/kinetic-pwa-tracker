@@ -353,7 +353,7 @@ function buildPage(item, pageIdx) {
       dataset: { i: String(i) },
     },
       h('div', { class: 'aw-set-n' }, String(i + 1)),
-      field('aw-w', 'weight', row, i, 'decimal'),
+      weightField(row, i),
       repsStepper(row),
       field('aw-rpe', 'rpe', row, i, 'decimal'),
       h('button', {
@@ -365,6 +365,55 @@ function buildPage(item, pageIdx) {
         class: 'aw-set-del', type: 'button', 'aria-label': 'Quitar serie',
         onClick: () => removeRow(i),
       }, '×'),
+    );
+  }
+
+  /**
+   * Campo KG con stepper inline: [−] [input editable] [+]
+   * - Tap −/+ → -/+2.5 kg
+   * - Tap directo en el número → teclado decimal (edición manual)
+   * - Smart default: si el input está vacío y tocas +/−, salta al peso
+   *   sugerido (baseW) en vez de a 2.5 desde 0 — coherente con el reps
+   *   stepper que también salta al rango objetivo en su primer toque.
+   * - Min 0 kg (no permite valores negativos). */
+  function weightField(row, i) {
+    const inp = field('aw-w', 'weight', row, i, 'decimal');
+
+    const bump = (delta) => {
+      if (row.done) return;
+      const cur = numify(row.weight);
+      let next;
+      if (!Number.isFinite(cur) || cur <= 0) {
+        // Primer toque sobre input vacío → carga el peso sugerido.
+        const sugg = numify(baseW);
+        next = Number.isFinite(sugg) && sugg > 0 ? sugg : Math.max(0, delta);
+      } else {
+        // Redondeo a 0.5 para que un 57.5 + 2.5 quede en 60 limpio.
+        next = Math.max(0, Math.round((cur + delta) * 2) / 2);
+      }
+      row.weight = next;
+      row.userW = true;
+      inp.value = next;
+      if (!last) propagateWeight(i);
+      if (row.done) schedulePersist();
+    };
+
+    return h('div', { class: 'aw-w-stepper' },
+      h('button', {
+        class: 'aw-w-step', type: 'button',
+        'aria-label': 'Restar 2.5 kg',
+        title: '−2.5 kg',
+        disabled: row.done || undefined,
+        onClick: () => bump(-2.5),
+      }, '−'),
+      inp,
+      h('button', {
+        class: 'aw-w-step', type: 'button',
+        'aria-label': 'Sumar 2.5 kg',
+        title: '+2.5 kg',
+        disabled: row.done || undefined,
+        onClick: () => bump(+2.5),
+      }, '+'),
     );
   }
 
