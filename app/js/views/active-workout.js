@@ -585,33 +585,54 @@ function isPageDone(page) {
   return page.state.rows.every(r => r.done);
 }
 
-/** Calcula a dónde debe ir el botón inferior según el progreso GLOBAL. */
+/**
+ * Encuentra el primer ejercicio PENDIENTE en una dirección dada.
+ * @param {1|-1} direction +1 = adelante, -1 = atrás
+ * @param {number} fromIdx índice inicial (inclusive) de la búsqueda
+ * @returns {number} índice del primer pendiente, o -1 si no hay ninguno
+ *
+ * Usa isPageDone() como criterio → warmup, ejercicios borrados y series
+ * 100% completadas se tratan TODOS como "done" → invisibles para nav.
+ * Eso es el "Smart Skip / Linear Bypass" del requerimiento: la nav avanza
+ * sobre ejercicios completados sin que el usuario lo perciba.
+ */
+function findPendingIdx(direction, fromIdx) {
+  const n = pages.length;
+  for (let i = fromIdx; i >= 0 && i < n; i += direction) {
+    if (!isPageDone(pages[i])) return i;
+  }
+  return -1;
+}
+
+/** Calcula a dónde debe ir el botón INFERIOR (avanzar/terminar). */
 function nextNavTarget() {
   const n = pages.length;
   if (n === 0) return { mode: 'finish' };
 
-  // Estamos en el warmup → modo "Empezar entrenamiento" (CTA propia).
-  // Salto al primer ejercicio real (con ex válido).
+  // Warmup → CTA propia "Empezar entrenamiento" → primer ejercicio real.
   if (pages[idx] && pages[idx].warmup) {
     const firstExIdx = pages.findIndex((p, i) => i > 0 && p.ex);
     if (firstExIdx === -1) return { mode: 'finish' };
     return { mode: 'start', targetIdx: firstExIdx };
   }
 
-  const allDone = pages.every(isPageDone);
-  if (allDone) return { mode: 'finish' };
+  if (pages.every(isPageDone)) return { mode: 'finish' };
 
-  // Linear: ¿hay un siguiente directo? (mantiene la UX habitual sin saltos)
-  if (idx < n - 1) {
-    return { mode: 'next', targetIdx: idx + 1, ex: pages[idx + 1].ex };
+  // Smart skip ADELANTE: encuentra el primer pendiente desde idx+1.
+  const fwd = findPendingIdx(+1, idx + 1);
+  if (fwd !== -1) {
+    return { mode: 'next', targetIdx: fwd, ex: pages[fwd].ex };
   }
 
-  // Estamos en la ÚLTIMA pero algo está pendiente → vuelta al primer saltado.
-  const skipIdx = pages.findIndex((p, i) => i !== idx && !isPageDone(p));
-  if (skipIdx === -1) {
-    return { mode: 'finish' };
+  // Sin pendientes adelante: ¿hay pendientes atrás saltados?
+  const bwd = findPendingIdx(-1, idx - 1);
+  if (bwd !== -1) {
+    return { mode: 'back', targetIdx: bwd, ex: pages[bwd].ex };
   }
-  return { mode: 'back', targetIdx: skipIdx, ex: pages[skipIdx].ex };
+
+  // Caso límite: solo el ejercicio actual está pendiente. No hay a dónde
+  // navegar — el usuario debe completar las series aquí. Botón deshabilitado.
+  return { mode: 'stay' };
 }
 
 function updateChrome() {
@@ -638,12 +659,17 @@ function updateChrome() {
   const foot      = $('#awNext');
   const prevBtn   = $('#awPrev');
   const changeBtn = $('#awChange');
-  prevBtn.style.visibility   = idx > 0 ? 'visible' : 'hidden';
+  // Smart prev: visible solo si hay un pendiente HACIA ATRÁS — si todos los
+  // anteriores ya están completados, no tiene sentido ofrecer "volver".
+  const prevPendingIdx = findPendingIdx(-1, idx - 1);
+  prevBtn.style.visibility   = prevPendingIdx !== -1 ? 'visible' : 'hidden';
+  prevBtn.setAttribute('data-target-idx', String(prevPendingIdx));
   // "Cambiar ej." no aplica al warmup (no hay ejercicio que cambiar).
   if (changeBtn) changeBtn.style.visibility = (cur && cur.warmup) ? 'hidden' : 'visible';
 
   const action = nextNavTarget();
-  foot.classList.remove('finish', 'return', 'start');
+  foot.classList.remove('finish', 'return', 'start', 'stay');
+  foot.disabled = false;
   foot.innerHTML = '';
 
   if (action.mode === 'finish') {
@@ -663,8 +689,18 @@ function updateChrome() {
       h('span', { class: 'aw-next-name' }, action.ex ? action.ex.name : '—'),
       h('span', { class: 'aw-next-arrow' }, '↶'),
     );
+  } else if (action.mode === 'stay') {
+    // Único pendiente = current → no hay donde ir. Botón disabled +
+    // mensaje que invita a completar las series aquí.
+    foot.classList.add('stay');
+    foot.disabled = true;
+    foot.append(
+      h('span', { class: 'aw-next-cap' }, '·'),
+      h('span', { class: 'aw-next-name' }, 'Completa las series'),
+    );
   } else {
-    // mode === 'next'
+    // mode === 'next' — apunta al SIGUIENTE PENDIENTE (que puede no ser
+    // idx+1 si hay ejercicios ya completados intermedios).
     foot.append(
       h('span', { class: 'aw-next-cap' }, 'Siguiente'),
       h('span', { class: 'aw-next-name' }, action.ex ? action.ex.name : '—'),
@@ -994,16 +1030,25 @@ export function openActiveWorkout() {
     buildRest(),
     h('div', { class: 'aw-foot' },
       h('button', { class: 'aw-prev', id: 'awPrev', type: 'button',
-        'aria-label': 'Anterior', onClick: () => goTo(idx - 1) }, '‹'),
+        'aria-label': 'Anterior ejercicio pendiente',
+        // Smart skip atrás: salta a la primera página PENDIENTE en sentido
+        // descendente. Si no hay ninguna, no-op (el botón está oculto vía
+        // updateChrome). Esto evita pasar por done exercises camino atrás.
+        onClick: () => {
+          const target = findPendingIdx(-1, idx - 1);
+          if (target !== -1) goTo(target);
+        } }, '‹'),
       h('button', { class: 'aw-change', id: 'awChange', type: 'button',
         onClick: () => openChangeSheet() }, '⇄ Cambiar ej.'),
       h('button', { class: 'aw-next', id: 'awNext', type: 'button',
         // El handler delega en nextNavTarget(), que mira el progreso GLOBAL
-        // (no solo `idx`) y decide entre: ir al siguiente lineal, volver al
-        // primer pendiente saltado, o disparar finishFromPlayer.
+        // (no solo `idx`) y decide entre: salto al siguiente pendiente,
+        // volver a un pendiente saltado, terminar entrenamiento, o no-op
+        // (modo 'stay' cuando solo el current está pendiente).
         onClick: () => {
           const a = nextNavTarget();
           if (a.mode === 'finish') return finishFromPlayer();
+          if (a.mode === 'stay')   return;
           return goTo(a.targetIdx);
         } }),
     ),

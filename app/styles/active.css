@@ -404,6 +404,21 @@ body.aw-open .rest-panel { display: none !important; }
 }
 .aw-next.start .aw-next-arrow { color: #1a0a00; }
 
+/* Modo "stay" = sólo el ejercicio actual está pendiente. No hay nada a
+   donde navegar — el botón queda deshabilitado para evitar tap accidental
+   en "Terminar" sin haber completado las series del ejercicio en curso. */
+.aw-next.stay,
+.aw-next:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--panel-2);
+  border-color: var(--line);
+  color: var(--muted);
+}
+.aw-next.stay .aw-next-cap { color: var(--muted); }
+.aw-next.stay .aw-next-name { color: var(--text-2); }
+
 /* ============================================================================
    Página de CALENTAMIENTO — pages[0] del player
    ----------------------------------------------------------------------------
