@@ -118,12 +118,13 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-sets { display: flex; flex-direction: column; gap: 8px; }
 
 /* Cabecera de columnas: una sola vez, alineada con la grid de la fila.
-   (Adiós a los labels flotantes que se superponían entre filas.) */
+   (Adiós a los labels flotantes que se superponían entre filas.)
+   7 columnas: n · kg · reps · rpe · bump↑ · check · del */
 .aw-set-head,
 .aw-set {
   display: grid;
-  grid-template-columns: 28px 1fr 1fr 56px 50px 22px;
-  gap: 8px; align-items: center;
+  grid-template-columns: 28px minmax(0,1fr) minmax(0,1fr) 56px 28px 50px 22px;
+  gap: 6px; align-items: center;
 }
 .aw-set-head { padding: 0 10px 2px; }
 .aw-set-head span {
@@ -504,4 +505,64 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-sheet-search:focus { outline: none; border-color: var(--accent); }
 .aw-sheet-empty {
   text-align: center; color: var(--muted); font-size: 13px; padding: 16px;
+}
+
+/* ============================================================================
+   BUMP TOGGLE · "subir peso en la siguiente serie"
+   ----------------------------------------------------------------------------
+   Pequeño botón con flecha ↑ entre RPE y check. Estado off = borde tenue +
+   color muted. Estado on = fondo naranja translúcido + halo accent → señala
+   visualmente que la próxima serie llevará un incremento automático.
+   El estado es per-sesión (transient: vive en row.bump, no persiste al Store).
+   ============================================================================ */
+.aw-bump {
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px; font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  line-height: 1;
+  transition: background .15s, border-color .15s, color .15s, transform .12s, box-shadow .2s;
+}
+.aw-bump:hover {
+  border-color: var(--accent);
+  color: var(--accent-2);
+}
+.aw-bump.on {
+  background: rgba(255,107,0,.16);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(255,107,0,.4), 0 4px 10px rgba(255,107,0,.18);
+}
+.aw-bump:disabled {
+  opacity: .35;
+  cursor: default;
+}
+.aw-bump:active { transform: scale(.9); }
+/* Fila completada con bump activado: mantenemos el indicador con menos
+   intensidad — el set ya está cerrado pero la marca informa que la
+   siguiente serie ya cogió el incremento. */
+.aw-set.is-completed .aw-bump.on {
+  opacity: .75;
+  box-shadow: none;
+}
+
+/* === Estado "fila recién auto-bumpeada" ===
+   Cuando el sistema pre-carga el KG de una serie con el incremento (porque
+   la serie anterior estaba marcada con bump), la fila se ilumina sutilmente
+   con un pulso naranja en el input de peso → comunica al usuario "este
+   valor lo puse yo, edítalo si quieres". El pulso se queda hasta que el
+   usuario toca el input (input event → JS retira la clase). */
+.aw-set.is-bumped .aw-w {
+  background: rgba(255,107,0,.08);
+  border-color: rgba(255,107,0,.35);
+  animation: aw-bump-flash .9s ease-out;
+}
+@keyframes aw-bump-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(255,107,0,.5); }
+  100% { box-shadow: 0 0 0 10px rgba(255,107,0,0); }
 }
