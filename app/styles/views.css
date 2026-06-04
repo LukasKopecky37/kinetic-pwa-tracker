@@ -394,6 +394,136 @@
   display:grid; grid-template-columns:1fr 1fr; gap:10px;
   margin:6px 0 20px;
 }
+
+/* ============================================================================
+   Weekly Overview · comparativa semana actual vs anterior
+   ----------------------------------------------------------------------------
+   Tarjeta premium arriba del Bento Bento. Tres métricas (Volumen, Series,
+   Intensidad) con micro-badges de delta vs la semana anterior. Banner
+   motivacional cuando el delta de volumen > 5%.
+   ============================================================================ */
+.an-weekly {
+  margin: 8px 0 14px;
+}
+.an-weekly-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: linear-gradient(90deg,
+    rgba(255,107,0,.16) 0%,
+    rgba(255,164,92,.08) 100%);
+  border: 1px solid rgba(255,107,0,.35);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--text);
+  letter-spacing: 0.1px;
+  animation: anw-banner-in .35s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+@keyframes anw-banner-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anw-banner-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.anw-banner-text { flex: 1; line-height: 1.3; }
+.anw-banner-text b { color: var(--accent); font-weight: 800; }
+
+.an-weekly-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0 4px 8px;
+}
+.an-weekly-eyebrow {
+  font-size: 10px; font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase; letter-spacing: 1.6px;
+}
+.an-weekly-range {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.an-weekly-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.an-w-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 12px 11px;
+  min-width: 0;
+}
+.an-w-label {
+  font-size: 10px; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1.1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.an-w-value {
+  margin-top: 4px;
+  font-size: 20px; font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.an-w-value .anw-unit {
+  font-size: 11px; font-weight: 600;
+  color: var(--muted);
+  margin-left: 2px;
+  letter-spacing: 0;
+}
+.an-w-delta {
+  margin-top: 7px;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+  background: var(--neutral-bg);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.an-w-delta.up {
+  background: rgba(52,211,153,.12);
+  color: var(--good);
+  border-color: rgba(52,211,153,.28);
+}
+.an-w-delta.down {
+  background: rgba(248,113,113,.10);
+  color: #f87171;
+  border-color: rgba(248,113,113,.25);
+}
+.an-w-delta.flat {
+  /* neutral default state */
+}
+.an-w-delta-arrow { font-size: 9px; line-height: 1; }
+.an-w-footer {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+.an-w-empty {
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.1px;
+}
+@media (max-width: 380px) {
+  .an-weekly-grid { gap: 6px; }
+  .an-w-card { padding: 10px 8px 9px; }
+  .an-w-value { font-size: 17px; }
+}
 .bento{
   position:relative; overflow:hidden;
   background:var(--panel); border:1px solid var(--line);

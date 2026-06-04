@@ -20,7 +20,7 @@ import {
   calculateMuscleVolume, normalizeMuscleVolume, regionIntensities,
 } from '../analytics/muscle-load.js';
 import { bestEstimated1RM } from '../analytics/one-rm.js';
-import { sessionVolume, sessionSetCount } from '../analytics/volume.js';
+import { sessionVolume, sessionSetCount, weeklyMetrics } from '../analytics/volume.js';
 
 let volChart = null;
 
@@ -33,6 +33,7 @@ const isoDaysAgo = (n) => {
 };
 
 export function renderAnalysis() {
+  renderWeeklyOverview();
   renderBento();
 
   // Volumen por grupo
@@ -89,6 +90,140 @@ function renderAdherence() {
       return `<div class="${cls.join(' ')}" title="${t}"></div>`;
     }).join('');
   }
+}
+
+/* ============================================================================
+   Weekly Overview · comparativa semana actual vs anterior
+   ----------------------------------------------------------------------------
+   Tres métricas (Volumen, Series, Intensidad) con micro-delta vs los 7 días
+   anteriores. Banner motivacional cuando el volumen sube >5%.
+   ============================================================================ */
+
+const BANNER_THRESHOLD       = 0.05;   // +5% volumen → banner motivacional
+const BANNER_EPIC_THRESHOLD  = 0.20;   // +20% volumen → banner "imparable"
+
+/** Formatea un nº grande con separador de miles inglés ("12,400").
+ *  Coherente con los charts y bento que ya usan ese formato. */
+function fmtBigNum(n) {
+  const r = Math.round(n);
+  return r.toLocaleString('en-US');
+}
+
+/** Computa el delta proporcional entre dos valores numéricos.
+ *  @returns {{dir:'up'|'down'|'flat', pct:number|null, isNew:boolean}}
+ *    pct=null cuando prev=0 y curr>0 (no se puede dividir → marca isNew). */
+function computeDelta(curr, prev) {
+  if (prev === 0 && curr === 0) return { dir: 'flat', pct: 0, isNew: false };
+  if (prev === 0)               return { dir: 'up',   pct: null, isNew: true };
+  const ratio = (curr - prev) / prev;
+  const pct = ratio * 100;
+  if (Math.abs(pct) < 0.5) return { dir: 'flat', pct, isNew: false };
+  return { dir: pct > 0 ? 'up' : 'down', pct, isNew: false };
+}
+
+/** Construye un badge de delta. */
+function deltaBadge(d) {
+  const arrow = d.dir === 'up'   ? '▲'
+              : d.dir === 'down' ? '▼'
+              : '·';
+  const label = d.isNew
+    ? 'nuevo'
+    : (d.pct == null ? '—'
+       : (d.pct > 0 ? '+' : '') + d.pct.toFixed(0) + '%');
+  return h('span', { class: 'an-w-delta ' + d.dir, title: 'vs. semana anterior' },
+    h('span', { class: 'an-w-delta-arrow' }, arrow),
+    h('span', null, label),
+  );
+}
+
+/** Banner motivacional basado en el delta del volumen total. */
+function motivationalBanner(volDelta) {
+  if (volDelta.dir !== 'up') return null;
+  const pct = volDelta.pct;
+  // Cuando es "nuevo" (sin semana anterior) usamos un mensaje suave: no es
+  // un récord de mejora, es el primer arranque.
+  if (volDelta.isNew) return null;
+  if (pct < BANNER_THRESHOLD * 100) return null;
+
+  const epic = pct >= BANNER_EPIC_THRESHOLD * 100;
+  return h('div', { class: 'an-weekly-banner' },
+    h('span', { class: 'anw-banner-icon', 'aria-hidden': 'true' },
+      epic ? '⚡' : '📈'),
+    h('div', { class: 'anw-banner-text' },
+      epic ? '¡Ritmo imparable!' : '¡Semana de progresión máxima!',
+      ' · ',
+      h('b', null, '+' + Math.round(pct) + '% volumen'),
+      ' vs. semana anterior.',
+    ),
+  );
+}
+
+/** Rango de fechas humanizado para el header ("28 may - 4 jun"). */
+function rangeLabel(startISO, endISO) {
+  const fmt = (iso) => {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+            .replace('.', '');
+  };
+  // end es exclusivo en weeklyMetrics → mostramos end - 1 día.
+  const e = new Date(endISO + 'T00:00:00');
+  e.setDate(e.getDate() - 1);
+  return `${fmt(startISO)} – ${fmt(e.toISOString().slice(0, 10))}`;
+}
+
+function renderWeeklyOverview() {
+  const host = $('#anWeekly');
+  if (!host) return;
+  const sessions = Store.data.sessions || [];
+
+  const curr = weeklyMetrics(sessions, 7, 0);     // últimos 7 días
+  const prev = weeklyMetrics(sessions, 7, 7);     // los 7 anteriores
+
+  // Si no hay actividad en NINGUNA de las dos semanas, ocultamos el bloque
+  // (no aportar ruido visual cuando no hay nada que comparar).
+  if (curr.totalSets === 0 && prev.totalSets === 0) {
+    mount(host, []);
+    return;
+  }
+
+  const dVol  = computeDelta(curr.totalVolume, prev.totalVolume);
+  const dSets = computeDelta(curr.totalSets,   prev.totalSets);
+  const dWgt  = computeDelta(curr.avgWeight,   prev.avgWeight);
+  const banner = motivationalBanner(dVol);
+
+  mount(host, h('div', { class: 'an-weekly' },
+    banner,
+    h('div', { class: 'an-weekly-head' },
+      h('span', { class: 'an-weekly-eyebrow' }, 'ESTA SEMANA'),
+      h('span', { class: 'an-weekly-range' }, rangeLabel(curr.start, curr.end)),
+    ),
+    h('div', { class: 'an-weekly-grid' },
+      h('div', { class: 'an-w-card' },
+        h('div', { class: 'an-w-label' }, 'Volumen'),
+        h('div', { class: 'an-w-value' },
+          fmtBigNum(curr.totalVolume),
+          h('span', { class: 'anw-unit' }, ' kg·rep'),
+        ),
+        deltaBadge(dVol),
+      ),
+      h('div', { class: 'an-w-card' },
+        h('div', { class: 'an-w-label' }, 'Series'),
+        h('div', { class: 'an-w-value' },
+          fmtBigNum(curr.totalSets),
+        ),
+        deltaBadge(dSets),
+      ),
+      h('div', { class: 'an-w-card' },
+        h('div', { class: 'an-w-label' }, 'Intensidad'),
+        h('div', { class: 'an-w-value' },
+          (curr.avgWeight > 0 ? curr.avgWeight.toFixed(1) : '0'),
+          h('span', { class: 'anw-unit' }, ' kg/set'),
+        ),
+        deltaBadge(dWgt),
+      ),
+    ),
+    h('div', { class: 'an-w-footer' }, 'vs. semana anterior'),
+  ));
 }
 
 /* ============================================================================

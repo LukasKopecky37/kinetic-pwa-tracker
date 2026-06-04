@@ -107,3 +107,81 @@ export function adherenceMatrix(sessions, weeks = 12) {
   }
   return cells;
 }
+
+/**
+ * Métricas agregadas para una ventana de N días, con offset hacia el pasado.
+ *
+ *   weeklyMetrics(sessions)              → últimos 7 días desde hoy
+ *   weeklyMetrics(sessions, 7, 7)        → 7 días anteriores (la semana previa)
+ *   weeklyMetrics(sessions, 7, 14)       → la semana de hace 2-3 semanas
+ *
+ * El offset se mide en DÍAS desde "hoy" hacia atrás. La ventana va de
+ *   [hoy - offset - windowDays, hoy - offset).
+ *
+ * Devuelve:
+ *   - totalVolume:  Σ(weight × reps) en kg·rep, work sets only
+ *   - totalSets:    nº de series no-warmup con reps válidas
+ *   - avgWeight:    promedio de KG en work sets (mide intensidad)
+ *   - avgRPE:       promedio de RPE en work sets que lo registraron
+ *   - sessionCount: nº de sesiones únicas (por fecha+ejercicio) en la ventana
+ *   - workoutDays:  nº de días distintos con al menos 1 set válido
+ *
+ * @param {Array<{date:string, sets:Array}>} sessions
+ * @param {number} [windowDays=7]
+ * @param {number} [offsetDays=0]
+ * @returns {{
+ *   totalVolume:number, totalSets:number, avgWeight:number,
+ *   avgRPE:number, sessionCount:number, workoutDays:number,
+ *   start:string, end:string
+ * }}
+ */
+export function weeklyMetrics(sessions, windowDays = 7, offsetDays = 0) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(today);
+  end.setDate(end.getDate() - offsetDays);
+  const start = new Date(end);
+  start.setDate(start.getDate() - windowDays);
+  const startISO = start.toISOString().slice(0, 10);
+  const endISO   = end.toISOString().slice(0, 10);
+
+  const inRange = (sessions || []).filter(s => s.date >= startISO && s.date < endISO);
+
+  let totalVolume = 0;
+  let totalSets   = 0;
+  let weightSum   = 0;
+  let weightCnt   = 0;
+  let rpeSum      = 0;
+  let rpeCnt      = 0;
+  const days = new Set();
+
+  for (const s of inRange) {
+    let validInSession = 0;
+    for (const set of (s.sets || [])) {
+      if (set.warmup) continue;
+      if (!set.reps) continue;
+      const w = set.weight || 0;
+      const r = set.reps || 0;
+      totalVolume += w * r;
+      totalSets   += 1;
+      if (w > 0) { weightSum += w; weightCnt += 1; }
+      if (set.rpe != null && set.rpe !== '' && !isNaN(parseFloat(set.rpe))) {
+        rpeSum += parseFloat(set.rpe);
+        rpeCnt += 1;
+      }
+      validInSession += 1;
+    }
+    if (validInSession > 0) days.add(s.date);
+  }
+
+  return {
+    totalVolume,
+    totalSets,
+    avgWeight: weightCnt > 0 ? weightSum / weightCnt : 0,
+    avgRPE:    rpeCnt > 0 ? rpeSum / rpeCnt : 0,
+    sessionCount: inRange.length,
+    workoutDays: days.size,
+    start: startISO,
+    end:   endISO,
+  };
+}
