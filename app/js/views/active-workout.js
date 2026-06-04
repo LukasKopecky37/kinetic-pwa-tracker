@@ -434,6 +434,12 @@ function buildPage(item, pageIdx) {
       const sess = persist(state);
       renderSets();
       refreshProgress();
+      // FIX (bug del 'stay' atascado): cuando cierras la ÚLTIMA serie del
+      // ÚLTIMO ejercicio pendiente, el botón inferior necesita reevaluar
+      // nextNavTarget() para pasar de 'stay'/'next' a 'finish'. Sin esto,
+      // el usuario queda atascado con "Completa las series" disabled
+      // aunque ya no quede nada pendiente en toda la rutina.
+      updateChrome();
       const isPR = sess && Store.isPR(sess);
       if (isPR && !state.prCelebrated) {
         state.prCelebrated = true;
@@ -450,18 +456,26 @@ function buildPage(item, pageIdx) {
       persist(state);
       renderSets();
       refreshProgress();
+      // Mismo motivo en la dirección inversa: reabrir una serie cierra el
+      // ejercicio actual y reabre el "stay" o el "next" — necesita refresh.
+      updateChrome();
     }
   }
 
   function removeRow(i) {
     clearTimeout(persistT);
     const wasDone = state.rows[i].done;
+    const wasAllDone = state.rows.every(r => r.done);
     state.rows.splice(i, 1);
     if (state.rows.length === 0) {
       state.rows.push({ weight: baseW, reps: targetReps, rpe: '', done: false });
     }
     if (wasDone) { persist(state); refreshProgress(); }
     renderSets();
+    // Si la fila eliminada era la que mantenía la serie incompleta — o si
+    // tras quitar una done el ejercicio deja de estar 100% completado — el
+    // botón inferior necesita reevaluarse.
+    if (wasDone || wasAllDone) updateChrome();
   }
 
   let persistT = null;
