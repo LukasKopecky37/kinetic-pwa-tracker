@@ -127,6 +127,9 @@ function buildExerciseCard(routine, item, nextOrder) {
       <div class="ex-status ${todayDone ? 'done' : ''}"></div>
     </div>
     <div class="ex-body">
+      <div class="sets-list-head" aria-hidden="true">
+        <span></span><span>kg</span><span>reps</span><span>rpe</span><span></span>
+      </div>
       <div class="sets-list" data-sets></div>
       <button class="btn-add-set" type="button">+ Añadir serie</button>
       <div class="field" style="margin-top:12px">
@@ -154,24 +157,24 @@ function buildExerciseCard(routine, item, nextOrder) {
       <div class="set-row" data-idx="${i}">
         <div class="set-num">${i + 1}</div>
         <div class="set-field">
-          <label>kg</label>
           <input class="s-w" type="number" inputmode="decimal" step="0.5"
+                 aria-label="Peso de la serie ${i + 1} en kilogramos"
                  value="${s.weight ?? ''}"
                  placeholder="${lastTop ? lastTop.weight : (suggestedW ?? '')}">
-          <button class="plate-icon b-plate" title="Discos" type="button">⚖</button>
+          <button class="plate-icon b-plate" title="Discos" type="button" aria-label="Calculadora de discos">⚖</button>
         </div>
         <div class="set-field">
-          <label>reps</label>
           <input class="s-r" type="number" inputmode="numeric"
+                 aria-label="Repeticiones de la serie ${i + 1}"
                  value="${s.reps ?? ''}"
                  placeholder="${lastTop ? lastTop.reps : '—'}">
         </div>
         <div class="set-field set-rpe">
-          <label>RPE</label>
           <input class="s-rpe" type="number" inputmode="decimal" min="1" max="10" step="0.5"
+                 aria-label="RPE de la serie ${i + 1}"
                  value="${s.rpe ?? ''}">
         </div>
-        <button class="set-del" title="Quitar serie" type="button">×</button>
+        <button class="set-del" title="Quitar serie" type="button" aria-label="Quitar serie ${i + 1}">×</button>
       </div>
     `).join('');
 

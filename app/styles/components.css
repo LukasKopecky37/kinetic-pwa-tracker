@@ -50,32 +50,60 @@
 .reps-row .field input{ text-align:center; padding:13px 4px; font-weight:600; }
 .reps-row .field label{ text-align:center; }
 
-/* ---- Sets list (v6, Fase H) ----
+/* ---- Sets list (v6, Fase H — refinada UI/UX senior) ----
    Una fila por serie: nº · peso · reps · RPE · borrar.
-   Pensada mobile-first. */
-.sets-list{ display:flex; flex-direction:column; gap:6px; margin-top:14px; }
+   Labels antes flotaban en `position:absolute; top:-15px` sobre cada fila,
+   creando desfase visual + repetición ruidosa con 3+ series.
+   Solución: UN ÚNICO header columnar arriba (`.sets-list-head`) que rotula
+   las columnas como en Numbers/Excel. Limpio, simétrico, no se repite. */
+.sets-list{
+  display:flex; flex-direction:column; gap:6px;
+  margin-top:0;     /* el header ya da la separación con el h4 "Series" */
+  padding-top:0;    /* ya no reservamos espacio para labels absolutos */
+}
+
+/* Header columnar: rotula KG / REPS / RPE alineado a las columnas de inputs.
+   Misma grid-template que .set-row → garantía de alineación perfecta. */
+.sets-list-head{
+  display:grid;
+  grid-template-columns:22px 1fr 1fr 64px 26px;
+  gap:6px; align-items:center;
+  padding:0 8px;
+  margin:14px 0 6px;
+}
+.sets-list-head > span{
+  font-size:10px; font-weight:700;
+  color:var(--muted);
+  text-transform:uppercase; letter-spacing:.9px;
+  text-align:center;
+}
+
 .set-row{
   display:grid;
   grid-template-columns:22px 1fr 1fr 64px 26px;
   gap:6px; align-items:center;
   background:var(--panel-2); border:1px solid var(--line);
-  border-radius:var(--radius-sm); padding:10px 8px;
+  border-radius:var(--radius-sm); padding:11px 8px;
 }
 .set-row .set-num{
   text-align:center; font-weight:700; font-size:13px; color:var(--muted);
   font-variant-numeric:tabular-nums;
 }
-.set-row .set-field{ position:relative; display:flex; align-items:center; gap:4px; }
-.set-row .set-field > label{
-  position:absolute; top:-15px; left:4px;
-  font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px;
-  pointer-events:none;
-}
+.set-row .set-field{ display:flex; align-items:center; gap:4px; }
+/* Safety net: si alguna llamada antigua todavía mete un <label> dentro de
+   .set-field, lo ocultamos para no romper la simetría columnar. */
+.set-row .set-field > label{ display:none; }
 .set-row .set-field input{
   flex:1; min-width:0; background:var(--neutral-bg); border:1px solid var(--line);
-  border-radius:8px; color:var(--text); padding:10px 6px;
+  border-radius:8px; color:var(--text); padding:11px 6px;
   text-align:center; font-weight:700; font-size:15px;
   font-variant-numeric:tabular-nums; -webkit-appearance:none;
+  /* iOS Safari: matamos el spinner nativo para no romper el centrado */
+  -moz-appearance:textfield;
+}
+.set-row .set-field input::-webkit-outer-spin-button,
+.set-row .set-field input::-webkit-inner-spin-button{
+  -webkit-appearance:none; margin:0;
 }
 .set-row .set-field input:focus{ outline:none; border-color:var(--accent); }
 .set-row .set-field .plate-icon{
@@ -88,9 +116,6 @@
   align-self:center;
 }
 .set-row .set-del:hover{ background:var(--bad-bg); }
-
-/* Espacio para que las labels superpuestas no se peguen al borde superior */
-.sets-list{ padding-top:8px; }
 
 .btn-add-set{
   width:100%; margin-top:8px;

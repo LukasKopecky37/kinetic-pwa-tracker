@@ -236,16 +236,22 @@ export function openEditSession(ex, sess) {
   const renderSetsList = () => setsState.map((s, i) => `
     <div class="set-row" data-idx="${i}">
       <div class="set-num">${i + 1}</div>
-      <div class="set-field"><label>kg</label>
-        <input class="es-w" type="number" step="0.5" value="${s.weight ?? ''}">
+      <div class="set-field">
+        <input class="es-w" type="number" step="0.5" inputmode="decimal"
+               aria-label="Peso de la serie ${i + 1} en kilogramos"
+               value="${s.weight ?? ''}">
       </div>
-      <div class="set-field"><label>reps</label>
-        <input class="es-r" type="number" value="${s.reps ?? ''}">
+      <div class="set-field">
+        <input class="es-r" type="number" inputmode="numeric"
+               aria-label="Repeticiones de la serie ${i + 1}"
+               value="${s.reps ?? ''}">
       </div>
-      <div class="set-field set-rpe"><label>RPE</label>
-        <input class="es-rpe" type="number" min="1" max="10" step="0.5" value="${s.rpe ?? ''}">
+      <div class="set-field set-rpe">
+        <input class="es-rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal"
+               aria-label="RPE de la serie ${i + 1}"
+               value="${s.rpe ?? ''}">
       </div>
-      <button class="set-del" type="button">×</button>
+      <button class="set-del" type="button" aria-label="Borrar serie ${i + 1}">×</button>
     </div>
   `).join('');
 
@@ -259,6 +265,9 @@ export function openEditSession(ex, sess) {
     </div>
     <div class="modal-body">
       <h4>Series</h4>
+      <div class="sets-list-head" aria-hidden="true">
+        <span></span><span>kg</span><span>reps</span><span>rpe</span><span></span>
+      </div>
       <div class="sets-list" id="esSets">${renderSetsList()}</div>
       <button class="btn-add-set" type="button" id="esAdd">+ Añadir serie</button>
 
