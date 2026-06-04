@@ -63,13 +63,19 @@
 }
 
 /* Header columnar: rotula KG / REPS / RPE alineado a las columnas de inputs.
-   Misma grid-template que .set-row → garantía de alineación perfecta. */
+   Misma grid-template que .set-row → garantía de alineación perfecta.
+   Variante `.has-plate`: 6 columnas en lugar de 5 cuando el row incluye la
+   calculadora de discos (⚖) como columna propia (no embebida en el input). */
 .sets-list-head{
   display:grid;
   grid-template-columns:22px 1fr 1fr 64px 26px;
   gap:6px; align-items:center;
   padding:0 8px;
   margin:14px 0 6px;
+}
+.sets-list-head.has-plate,
+.set-row.has-plate{
+  grid-template-columns:22px 1fr 30px 1fr 64px 26px;
 }
 .sets-list-head > span{
   font-size:10px; font-weight:700;
@@ -106,8 +112,13 @@
   -webkit-appearance:none; margin:0;
 }
 .set-row .set-field input:focus{ outline:none; border-color:var(--accent); }
-.set-row .set-field .plate-icon{
-  width:30px; height:34px; padding:0; font-size:13px; flex-shrink:0;
+/* Plate icon ahora vive como columna propia del grid (`.has-plate`), no como
+   hijo del .set-field. Eso garantiza simetría perfecta entre KG y REPS:
+   ambos inputs ocupan 1fr completo de su celda. El ⚖ ya no le "come" ancho
+   al input de KG. */
+.set-row > .plate-icon{
+  width:30px; height:34px; padding:0; font-size:13px;
+  align-self:center;
 }
 .set-row .set-rpe input{ font-size:13px; }
 .set-row .set-del{
@@ -169,18 +180,53 @@
 .btn.danger{ background:var(--bad-bg); color:var(--bad); border:1px solid var(--bad-border); }
 .btn.small{ padding:8px 12px; font-size:12px; }
 
-/* ----- Rest button (circular) ----- */
+/* ----- Rest button -----
+   Antes: círculo de 54px a la derecha de [Actualizar][Borrar] → colisión
+   visual con el border-radius del card + sensación "stuck-on" / fuera de
+   órbita. Refactor a pill horizontal full-width ARRIBA del row de acciones,
+   misma família visual que `.btn-add-set` (border dashed accent, transparente).
+   La estructura HTML <button class="rest-btn"><span>DESCANSO</span>
+   <span class="rb-time">2:00</span></button> queda intacta. */
 .rest-btn{
-  background:var(--panel-2); border:2px solid var(--accent); color:var(--accent-2);
-  width:54px; height:54px; border-radius:50%; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; flex-direction:column;
-  font-size:10px; font-weight:700; letter-spacing:.4px; line-height:1.2;
-  flex-shrink:0;
+  width:100%;
+  background:transparent;
+  border:1px dashed var(--accent);
+  color:var(--accent-2);
+  border-radius:var(--radius-sm);
+  padding:10px 14px;
+  cursor:pointer;
+  display:flex; align-items:center; gap:10px;
+  font-size:11px; font-weight:700; letter-spacing:.7px;
+  text-transform:uppercase;
+  transition:background .15s, border-style .15s;
 }
-.rest-btn:active{ transform:scale(.95); }
-.rest-btn .rb-time{ font-size:13px; font-weight:700; }
-.row-with-rest{ display:flex; gap:10px; align-items:center; margin-top:14px; }
-.row-with-rest .actions{ margin:0; flex:1; }
+.rest-btn::before{
+  content:'⏱';
+  font-size:14px;
+  letter-spacing:0;
+}
+.rest-btn .rb-time{
+  /* push a la derecha: deja el icono + "DESCANSO" a la izquierda, el tiempo
+     anclado a la derecha — sirve de "anchor visual" de la fila. */
+  margin-left:auto;
+  font-size:13px; font-weight:800; letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;
+  text-transform:none;
+}
+.rest-btn:hover{
+  background:rgba(255,107,0,.06);
+  border-style:solid;
+}
+.rest-btn:active{ transform:scale(.985); }
+
+/* Row de acciones + rest: ahora se apilan vertical (rest pill arriba,
+   actions abajo). `order: -1` en .rest-btn evita tener que cambiar el HTML. */
+.row-with-rest{
+  display:flex; flex-direction:column;
+  gap:8px; margin-top:14px;
+}
+.row-with-rest .actions{ margin:0; }
+.row-with-rest .rest-btn{ order:-1; }
 
 /* ----- Plate calculator button ----- */
 .plate-icon{

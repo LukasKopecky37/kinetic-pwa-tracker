@@ -127,8 +127,8 @@ function buildExerciseCard(routine, item, nextOrder) {
       <div class="ex-status ${todayDone ? 'done' : ''}"></div>
     </div>
     <div class="ex-body">
-      <div class="sets-list-head" aria-hidden="true">
-        <span></span><span>kg</span><span>reps</span><span>rpe</span><span></span>
+      <div class="sets-list-head has-plate" aria-hidden="true">
+        <span></span><span>kg</span><span></span><span>reps</span><span>rpe</span><span></span>
       </div>
       <div class="sets-list" data-sets></div>
       <button class="btn-add-set" type="button">+ Añadir serie</button>
@@ -154,15 +154,16 @@ function buildExerciseCard(routine, item, nextOrder) {
   const setsHost = card.querySelector('[data-sets]');
   const renderSets = () => {
     setsHost.innerHTML = setsState.map((s, i) => `
-      <div class="set-row" data-idx="${i}">
+      <div class="set-row has-plate" data-idx="${i}">
         <div class="set-num">${i + 1}</div>
         <div class="set-field">
           <input class="s-w" type="number" inputmode="decimal" step="0.5"
                  aria-label="Peso de la serie ${i + 1} en kilogramos"
                  value="${s.weight ?? ''}"
                  placeholder="${lastTop ? lastTop.weight : (suggestedW ?? '')}">
-          <button class="plate-icon b-plate" title="Discos" type="button" aria-label="Calculadora de discos">⚖</button>
         </div>
+        <button class="plate-icon b-plate" title="Calculadora de discos" type="button"
+                aria-label="Calculadora de discos para la serie ${i + 1}">⚖</button>
         <div class="set-field">
           <input class="s-r" type="number" inputmode="numeric"
                  aria-label="Repeticiones de la serie ${i + 1}"
