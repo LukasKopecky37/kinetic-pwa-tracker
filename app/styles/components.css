@@ -688,3 +688,72 @@
   box-shadow:0 8px 22px rgba(255,107,0,.28);
 }
 .pick-cta:active{ transform:scale(.985); }
+
+/* ============================================================================
+   CALENTAMIENTO · tarjeta fija al inicio de la rutina activa
+   ----------------------------------------------------------------------------
+   Bloque discreto tipo Apple Fitness: icono · título · meta · check circular.
+   Estado "done" cambia color del borde y opacidad sin desplazar nada del
+   layout siguiente. Persistencia local por fecha (`warmup-YYYY-MM-DD`).
+   ============================================================================ */
+.warmup-card{
+  display:flex; align-items:center; gap:14px;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px 16px;
+  margin-bottom:12px;
+  transition:opacity .25s, background .2s, border-color .2s;
+}
+.warmup-card.done{
+  background:rgba(52,211,153,.05);
+  border-color:rgba(52,211,153,.22);
+  opacity:.72;
+}
+.wu-icon{
+  font-size:24px; line-height:1;
+  flex-shrink:0;
+}
+.wu-info{
+  flex:1; min-width:0;
+}
+.wu-title{
+  font-size:14px; font-weight:700;
+  color:var(--text);
+  letter-spacing:-.1px;
+  transition:text-decoration .2s;
+}
+.warmup-card.done .wu-title{
+  text-decoration:line-through;
+  text-decoration-color:rgba(52,211,153,.45);
+  text-decoration-thickness:1.5px;
+}
+.wu-sub{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:3px;
+  letter-spacing:.2px;
+}
+.wu-check{
+  width:32px; height:32px;
+  background:transparent;
+  border:1.5px solid var(--line);
+  border-radius:50%;
+  color:var(--muted);
+  font-size:15px; font-weight:800;
+  cursor:pointer;
+  flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:inherit;
+  transition:background .18s, border-color .18s, color .18s, transform .12s;
+}
+.wu-check:hover{
+  border-color:var(--accent);
+  color:var(--accent-2);
+}
+.wu-check.on{
+  background:var(--good);
+  border-color:var(--good);
+  color:#052e1c;
+}
+.wu-check:active{ transform:scale(.92); }

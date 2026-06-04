@@ -314,6 +314,20 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-next.finish {
   background: var(--accent); border-color: transparent; color: #1a0a00;
 }
+/* === Modo "return" === botón te lleva a un ejercicio que saltaste.
+   Visualmente entre el "Siguiente" neutro y el "Terminar" solid orange:
+   borde y texto accent, fondo translúcido naranja. Comunica
+   "atención pendiente" sin gritarlo. */
+.aw-next.return {
+  background: rgba(255,107,0,.10);
+  border-color: rgba(255,107,0,.40);
+  color: var(--accent-2);
+}
+.aw-next.return .aw-next-cap { color: var(--accent-2); opacity: .85; }
+.aw-next.return .aw-next-arrow {
+  color: var(--accent);
+  font-size: 16px;        /* ↶ es ligeramente más ancho que › */
+}
 .aw-next-cap {
   font-size: 10px; color: var(--muted);
   text-transform: uppercase; letter-spacing: .8px; flex-shrink: 0;

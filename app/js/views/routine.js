@@ -70,7 +70,56 @@ export function renderRoutine() {
   const todayOrders = Store.sessionsByDate(date).map(s => s.order).filter(o => o != null);
   const nextOrder = (todayOrders.length ? Math.max(...todayOrders) : 0) + 1;
 
+  // Calentamiento al principio · check por fecha en localStorage
+  // (no contamina el modelo Workout / Store; es solo estado de UI persistente).
+  list.appendChild(buildWarmupCard(date));
   items.forEach((it) => list.appendChild(buildExerciseCard(r, it, nextOrder)));
+}
+
+/* ============================================================================
+   Calentamiento — tarjeta fija al principio de la rutina activa.
+   ----------------------------------------------------------------------------
+   UX: bloque discreto con check circular. Al tocarlo:
+     - on  → guarda `warmup-<date> = "1"` en localStorage
+     - off → elimina la key (toggle reversible)
+   Por qué localStorage y no el Store: un flag de UI no merece migraciones
+   v6→v7 ni ser parte del modelo Workout. Se borra solo si el usuario limpia
+   el storage del browser.
+   ============================================================================ */
+function buildWarmupCard(date) {
+  const KEY = 'warmup-' + date;
+  const isOn = () => localStorage.getItem(KEY) === '1';
+
+  const card = document.createElement('div');
+  card.className = 'warmup-card' + (isOn() ? ' done' : '');
+  card.innerHTML = `
+    <div class="wu-icon" aria-hidden="true">🔥</div>
+    <div class="wu-info">
+      <div class="wu-title">Calentamiento</div>
+      <div class="wu-sub">5-10 min · prepara tu cuerpo antes del primer ejercicio</div>
+    </div>
+    <button class="wu-check ${isOn() ? 'on' : ''}" type="button"
+            aria-label="${isOn() ? 'Calentamiento completado · tap para deshacer' : 'Marcar calentamiento como completado'}">${isOn() ? '✓' : ''}</button>
+  `;
+
+  card.querySelector('.wu-check').addEventListener('click', function(){
+    const wasOn = isOn();
+    if (wasOn) {
+      localStorage.removeItem(KEY);
+      this.classList.remove('on');
+      this.innerHTML = '';
+      this.setAttribute('aria-label', 'Marcar calentamiento como completado');
+      card.classList.remove('done');
+    } else {
+      localStorage.setItem(KEY, '1');
+      this.classList.add('on');
+      this.innerHTML = '✓';
+      this.setAttribute('aria-label', 'Calentamiento completado · tap para deshacer');
+      card.classList.add('done');
+    }
+  });
+
+  return card;
 }
 
 /* ============================================================================

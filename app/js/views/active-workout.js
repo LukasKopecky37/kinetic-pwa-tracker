@@ -400,6 +400,47 @@ function refreshProgress() {
   });
 }
 
+/* ============================================================================
+   Smart finish — el botón inferior detecta pendientes saltados
+   ----------------------------------------------------------------------------
+   Antes: lógica lineal pura. Si estabas en la última página, "Terminar"
+   aparecía AUNQUE el ejercicio 2 estuviera sin tocar porque te lo saltaste.
+   Ahora: si quedan pendientes, "Terminar" NO aparece — el botón te lleva al
+   primer pendiente saltado ("Volver a [name]"). Solo cuando todos están
+   completados el botón pasa a modo "Terminar entrenamiento".
+   ============================================================================ */
+function isPageDone(page) {
+  if (!page) return true;
+  if (!page.ex) return true;                // ejercicio borrado → no bloquea
+  if (!page.state || !page.state.rows.length) return false;
+  return page.state.rows.every(r => r.done);
+}
+
+/** Calcula a dónde debe ir el botón inferior según el progreso GLOBAL. */
+function nextNavTarget() {
+  const n = pages.length;
+  if (n === 0) return { mode: 'finish' };
+
+  const allDone = pages.every(isPageDone);
+  if (allDone) return { mode: 'finish' };
+
+  // Linear: ¿hay un siguiente directo? (mantiene la UX habitual sin saltos)
+  if (idx < n - 1) {
+    return { mode: 'next', targetIdx: idx + 1, ex: pages[idx + 1].ex };
+  }
+
+  // Estamos en la ÚLTIMA pero algo está pendiente → vuelta al primer saltado.
+  // Buscamos un pendiente que NO sea el propio current (si el current está
+  // pendiente, lo correcto es quedarse — pero como ya estamos en la última,
+  // ya está visible).
+  const skipIdx = pages.findIndex((p, i) => i !== idx && !isPageDone(p));
+  if (skipIdx === -1) {
+    // Solo el current está pendiente → ok, "Terminar" por simplicidad.
+    return { mode: 'finish' };
+  }
+  return { mode: 'back', targetIdx: skipIdx, ex: pages[skipIdx].ex };
+}
+
 function updateChrome() {
   const n = pages.length;
   $('#awCounter').textContent = n ? `Ej. ${idx + 1} / ${n}` : '';
@@ -410,25 +451,34 @@ function updateChrome() {
   } else {
     $('#awPos').textContent = '';
   }
-  // Pie: preview del siguiente o terminar
+
   const foot = $('#awNext');
   const prevBtn = $('#awPrev');
   prevBtn.style.visibility = idx > 0 ? 'visible' : 'hidden';
-  if (idx < n - 1) {
-    const nx = pages[idx + 1];
-    foot.classList.remove('finish');
-    foot.innerHTML = '';
+
+  const action = nextNavTarget();
+  foot.classList.remove('finish', 'return');
+  foot.innerHTML = '';
+
+  if (action.mode === 'finish') {
+    foot.classList.add('finish');
+    foot.append(h('span', { class: 'aw-next-name' }, 'Terminar entrenamiento'));
+  } else if (action.mode === 'back') {
+    foot.classList.add('return');
     foot.append(
-      h('span', { class: 'aw-next-cap' }, 'Siguiente'),
-      h('span', { class: 'aw-next-name' },
-        nx && nx.ex ? nx.ex.name : '—'),
-      h('span', { class: 'aw-next-arrow' }, '›'),
+      h('span', { class: 'aw-next-cap' }, 'Volver a'),
+      h('span', { class: 'aw-next-name' }, action.ex ? action.ex.name : '—'),
+      h('span', { class: 'aw-next-arrow' }, '↶'),
     );
   } else {
-    foot.classList.add('finish');
-    foot.innerHTML = '';
-    foot.append(h('span', { class: 'aw-next-name' }, 'Terminar entrenamiento'));
+    // mode === 'next'
+    foot.append(
+      h('span', { class: 'aw-next-cap' }, 'Siguiente'),
+      h('span', { class: 'aw-next-name' }, action.ex ? action.ex.name : '—'),
+      h('span', { class: 'aw-next-arrow' }, '›'),
+    );
   }
+
   refreshProgress();
 }
 
@@ -741,7 +791,14 @@ export function openActiveWorkout() {
       h('button', { class: 'aw-change', id: 'awChange', type: 'button',
         onClick: () => openChangeSheet() }, '⇄ Cambiar ej.'),
       h('button', { class: 'aw-next', id: 'awNext', type: 'button',
-        onClick: () => { idx < pages.length - 1 ? goTo(idx + 1) : finishFromPlayer(); } }),
+        // El handler delega en nextNavTarget(), que mira el progreso GLOBAL
+        // (no solo `idx`) y decide entre: ir al siguiente lineal, volver al
+        // primer pendiente saltado, o disparar finishFromPlayer.
+        onClick: () => {
+          const a = nextNavTarget();
+          if (a.mode === 'finish') return finishFromPlayer();
+          return goTo(a.targetIdx);
+        } }),
     ),
   ]);
 
