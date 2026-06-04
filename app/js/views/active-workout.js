@@ -229,15 +229,15 @@ function buildPage(item, pageIdx) {
   };
 
   // ---- Cabecera del ejercicio ----
-  // Botón "Notas técnicas" (ⓘ) junto al nombre. Indicador naranja
-  // automático si el ejercicio ya tiene notas guardadas en ex.tips.
+  // Botón "Tips" junto al nombre. Indicador naranja automático si el
+  // ejercicio ya tiene notas guardadas en ex.tips.
   const tipsBtn = h('button', {
     class: 'aw-ex-tips' + (ex.tips ? ' has-tips' : ''),
     type: 'button',
     'aria-label': ex.tips
       ? 'Notas técnicas del ejercicio (tienes notas guardadas)'
       : 'Añadir notas técnicas permanentes al ejercicio',
-    title: 'Notas técnicas',
+    title: 'Notas técnicas permanentes',
     onClick: () => openTipsModal(ex, () => {
       // Tras guardar refrescamos el indicador visual sin re-renderizar
       // la página entera (mantiene el foco y el scroll del usuario).
@@ -246,7 +246,7 @@ function buildPage(item, pageIdx) {
         ? 'Notas técnicas del ejercicio (tienes notas guardadas)'
         : 'Añadir notas técnicas permanentes al ejercicio');
     }),
-  }, 'ⓘ');
+  }, 'Tips');
 
   const head = h('div', { class: 'aw-ex-head' },
     h('div', { class: 'aw-ex-titles' },

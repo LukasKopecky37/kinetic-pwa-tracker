@@ -399,7 +399,11 @@
 .modal-bg{
   position:fixed; inset:0; background:rgba(0,0,0,.65);
   display:none; align-items:flex-end; justify-content:center;
-  z-index:50; padding:0;
+  /* z-index: 60 > .aw-overlay (55) → cuando el modal se abre desde dentro
+     del player a pantalla completa, queda POR ENCIMA del overlay y es
+     visible. Antes con z-index:50 quedaba enterrado debajo del player y
+     el usuario percibía "el botón no hace nada". */
+  z-index:60; padding:0;
 }
 .modal-bg.show{ display:flex; }
 @media(min-width:600px){ .modal-bg{ align-items:center; padding:20px; } }

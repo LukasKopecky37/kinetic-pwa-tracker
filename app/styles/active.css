@@ -119,15 +119,18 @@ body.aw-open .rest-panel { display: none !important; }
 }
 .aw-ex-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
-/* === Botón "Notas técnicas" del ejercicio === */
+/* === Botón "Tips" del ejercicio · pill horizontal === */
 .aw-ex-tips {
   position: relative;
   background: transparent;
   border: 1px solid var(--line);
   color: var(--accent-2);
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  font-size: 15px; font-weight: 700;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
   cursor: pointer;
   font-family: inherit;
   display: inline-flex; align-items: center; justify-content: center;
@@ -141,16 +144,17 @@ body.aw-open .rest-panel { display: none !important; }
   border-color: var(--accent);
   color: var(--accent);
 }
-.aw-ex-tips:active { transform: scale(.92); }
+.aw-ex-tips:active { transform: scale(.94); }
 /* Indicador naranja arriba-derecha cuando ya hay notas guardadas. */
 .aw-ex-tips.has-tips {
+  background: rgba(255,107,0,.08);
   border-color: rgba(255,107,0,.45);
   color: var(--accent);
 }
 .aw-ex-tips.has-tips::after {
   content: '';
   position: absolute;
-  top: -2px; right: -2px;
+  top: -3px; right: -3px;
   width: 9px; height: 9px;
   background: var(--accent);
   border: 2px solid var(--panel);
