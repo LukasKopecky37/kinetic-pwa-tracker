@@ -962,14 +962,56 @@
 
 /* Resumen de workout */
 .summary-hero{
-  text-align:center; padding:8px 0 14px;
+  text-align:center; padding:4px 0 16px;
 }
 .summary-hero .duration{
-  font-size:32px; font-weight:700; font-variant-numeric:tabular-nums;
-  letter-spacing:1px;
+  font-size:24px; font-weight:700; font-variant-numeric:tabular-nums;
+  letter-spacing:.8px;
+  color: var(--text-2);
 }
 .summary-hero .sub{
   font-size:12px; color:var(--muted); margin-top:4px;
+  letter-spacing:.3px;
+}
+
+/* === SUMMARY CHEER · "¡BRUTAL!" hero === */
+.summary-cheer{
+  font-size: clamp(40px, 13vw, 70px);
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  color: var(--accent);
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 0.92;
+  margin: 4px 0 10px;
+  text-shadow:
+    0 4px 28px rgba(255,107,0,.45),
+    0 2px 0 rgba(0,0,0,.18);
+  animation: cheer-pop .55s cubic-bezier(.18, 1.6, .4, 1) both;
+  /* Wrap solo en límite de palabras para que "ENTRENAMIENTO COMPLETADO"
+     se parta de forma natural si no cabe en una línea. */
+  word-break: keep-all;
+  hyphens: manual;
+}
+/* Variante para mensajes largos: ajusta el font-size hacia abajo para
+   que "¡ENTRENAMIENTO COMPLETADO!" mantenga impacto sin desbordar
+   en iPhone SE en portrait. */
+.summary-cheer.long {
+  font-size: clamp(26px, 8.5vw, 46px);
+  letter-spacing: -0.6px;
+}
+@keyframes cheer-pop {
+  from { opacity: 0; transform: scale(.7) translateY(8px); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Honor reduced-motion: el cheer aparece sin overshoot. */
+@media (prefers-reduced-motion: reduce) {
+  .summary-cheer {
+    animation: none;
+    text-shadow: 0 2px 0 rgba(0,0,0,.18);
+  }
 }
 
 .summary-stats{

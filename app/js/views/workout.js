@@ -101,6 +101,33 @@ export function confirmCancelWorkout(workoutId) {
    WORKOUT SUMMARY
    ============================================================================ */
 
+/**
+ * Mensaje de celebración random para el hero del resumen.
+ *
+ * Pesos: BRUTAL es la firma del usuario, ~65% de las veces. Los otros tres
+ * rotan para que la experiencia no sea monótona pero conserve identidad.
+ *   - BRUTAL                 65 / 100
+ *   - IMPARABLE              15 / 100
+ *   - ZANDADO                10 / 100
+ *   - ENTRENAMIENTO COMPLET  10 / 100
+ */
+const CHEER_MESSAGES = [
+  { text: '¡BRUTAL!',                  weight: 65 },
+  { text: '¡IMPARABLE!',               weight: 15 },
+  { text: '¡ZANDADO!',                 weight: 10 },
+  { text: '¡ENTRENAMIENTO COMPLETADO!', weight: 10 },
+];
+
+function pickCheerMessage() {
+  const total = CHEER_MESSAGES.reduce((s, m) => s + m.weight, 0);
+  let r = Math.random() * total;
+  for (const m of CHEER_MESSAGES) {
+    r -= m.weight;
+    if (r <= 0) return m.text;
+  }
+  return CHEER_MESSAGES[0].text;   // fallback (no debería caer aquí nunca)
+}
+
 export function openWorkoutSummary(workoutId) {
   const w = Store.workoutById(workoutId);
   if (!w) return;
@@ -191,14 +218,24 @@ export function openWorkoutSummary(workoutId) {
     : h('div', { class: 'empty', style: { padding: '20px' } },
         'No registraste ninguna serie en este entrenamiento.');
 
+  /* Hero del cheer: "¡BRUTAL!" o variación random. Entrada animada via
+     CSS (cheer-pop .55s con overshoot) sincronizada con el confeti. */
+  const cheerText = pickCheerMessage();
+  const cheerLong = cheerText.length > 12;
+  const cheerEl = h('div', {
+    class: 'summary-cheer' + (cheerLong ? ' long' : ''),
+    'aria-label': 'Entrenamiento completado',
+  }, cheerText);
+
   openModal('');
   mount($('#modal'), [
     h('div', { class: 'modal-head' },
-      h('h3', null, 'Entrenamiento completado'),
+      h('h3', null, 'Resumen'),
       h('button', { class: 'x', onClick: closeModal }, '×'),
     ),
     h('div', { class: 'modal-body' },
       h('div', { class: 'summary-hero' },
+        cheerEl,
         h('div', { class: 'duration' }, fmtDuration(summary.durationSec)),
         h('div', { class: 'sub' }, heroSub),
       ),
@@ -218,8 +255,11 @@ export function openWorkoutSummary(workoutId) {
     ),
   ]);
 
-  // Confetti si hubo PR(s) en este workout
-  if (summary.prCount > 0) {
-    setTimeout(() => fireConfetti(window.innerWidth / 2, window.innerHeight / 2.5), 280);
-  }
+  /* Confeti SIEMPRE al cerrar un workout. Antes solo se disparaba si había
+     PRs, pero el cierre del entrenamiento ya es per se el momento de
+     recompensa visual máxima. La función fireConfetti() ahora usa el
+     patrón "festival side-burst" (2.4s desde los laterales, ver
+     services/confetti.js). El delay de 280ms da tiempo a que el modal
+     entre y el cheer empiece su animación pop. */
+  setTimeout(() => fireConfetti(), 280);
 }
