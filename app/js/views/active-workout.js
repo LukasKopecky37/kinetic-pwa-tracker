@@ -113,6 +113,9 @@ function persist(state) {
     sets: doneSets,
     order: computeOrder(state.ex.id),
     notes: (state.notes || '').trim(),
+    // Override manual del usuario para la próxima sesión (transient en UI,
+    // persistido en el log para que suggestNextWeight lo respete).
+    ...(state.nextOverride ? { nextOverride: state.nextOverride } : {}),
   });
 }
 
@@ -214,6 +217,13 @@ function buildPage(item, pageIdx) {
   const state = {
     ex, item, restSec, rows,
     notes: todayDone?.notes || '',
+    /* === Override de carga para la PRÓXIMA sesión ===
+       null   → algoritmo automático (suggestNextWeight aplica double-progression)
+       'up'   → forzar progreso (+bumpKgFor en la próxima sesión)
+       'down' → forzar regresión (-bumpKgFor, mínimo 0)
+       Se persiste en la session log → la lee `suggestNextWeight` cuando el
+       generador construye la próxima sesión de este ejercicio. */
+    nextOverride: todayDone?.nextOverride || null,
     prCelebrated: false,
   };
 
@@ -237,22 +247,15 @@ function buildPage(item, pageIdx) {
   const setsHost = h('div', { class: 'aw-sets' });
 
   // Cabecera de columnas (una sola vez, alineada con la grid de la fila).
-  // 7 spans para 7 columnas: n · kg · reps · rpe · bump · check · del.
+  // 6 spans para 6 columnas: n · kg · reps · rpe · check · del.
   const headRow = () => h('div', { class: 'aw-set-head' },
     h('span', null, ''),
     h('span', null, 'KG'),
     h('span', null, 'REPS'),
     h('span', null, 'RPE'),
-    h('span', null, ''),       // columna del toggle bump (sin label)
     h('span', null, ''),
     h('span', null, ''),
   );
-
-  /* Bump increment · kg que se añaden a la siguiente serie cuando el usuario
-     marca `row.bump=true` y cierra la serie con ✓ (o añade una nueva). +2.5
-     es el incremento de un disco de 1.25 kg en cada lado de una barra olímpica
-     — el mínimo realista en gym estándar para fuerza compuesta. */
-  const BUMP_INCREMENT_KG = 2.5;
 
   /**
    * Módulo 3 — Autofill: al teclear KG en una serie y NO haber historial
@@ -286,13 +289,6 @@ function buildPage(item, pageIdx) {
       row[key] = v === '' ? '' : (key === 'reps' ? parseInt(v, 10) : parseFloat(v));
       if (key === 'weight') {
         row.userW = true;                 // esta fila fue editada a mano
-        // El usuario está sobreescribiendo un valor auto-bumpeado → quitamos
-        // el resalte visual SIN re-render (preservamos el foco del input).
-        if (row.isBumped) {
-          row.isBumped = false;
-          const setRow = inp.closest('.aw-set');
-          if (setRow) setRow.classList.remove('is-bumped');
-        }
         if (!last) propagateWeight(i);    // solo si no hay registro previo
       }
       if (row.done) schedulePersist();
@@ -353,27 +349,13 @@ function buildPage(item, pageIdx) {
       class: 'aw-set'
         + (row.done ? ' is-completed' : '')
         + (isNext ? ' next' : '')
-        + (under ? ' is-under' : '')
-        + (row.isBumped ? ' is-bumped' : ''),    // input KG resaltado tras auto-bump
+        + (under ? ' is-under' : ''),
       dataset: { i: String(i) },
     },
       h('div', { class: 'aw-set-n' }, String(i + 1)),
       field('aw-w', 'weight', row, i, 'decimal'),
       repsStepper(row),
       field('aw-rpe', 'rpe', row, i, 'decimal'),
-      // Toggle "subir peso en la siguiente serie" (+2.5 kg automáticos).
-      // Tap → ilumina naranja. Al cerrar la serie con ✓ (o al pulsar
-      // "+ añadir serie"), la siguiente fila precarga peso = current + 2.5.
-      h('button', {
-        class: 'aw-bump' + (row.bump ? ' on' : ''),
-        type: 'button',
-        'aria-label': row.bump
-          ? `Quitar marca de +${BUMP_INCREMENT_KG} kg en la siguiente serie`
-          : `Marcar +${BUMP_INCREMENT_KG} kg en la siguiente serie`,
-        title: `+${BUMP_INCREMENT_KG} kg en la siguiente`,
-        disabled: row.done || undefined,     // solo interactivo mientras editas
-        onClick: () => toggleBump(i),
-      }, '↑'),
       h('button', {
         class: 'aw-check', type: 'button',
         'aria-label': row.done ? 'Reabrir serie' : 'Marcar serie completada',
@@ -384,15 +366,6 @@ function buildPage(item, pageIdx) {
         onClick: () => removeRow(i),
       }, '×'),
     );
-  }
-
-  /** Toggle del flag transient row.bump. Solo aplica si la serie no está
-   *  cerrada (no tiene sentido marcar bump retroactivo en una done set). */
-  function toggleBump(i) {
-    const row = state.rows[i];
-    if (row.done) return;
-    row.bump = !row.bump;
-    renderSets();
   }
 
   function renderSets() {
@@ -409,23 +382,6 @@ function buildPage(item, pageIdx) {
         return;
       }
       row.done = true;
-
-      /* === Cascada del bump · si esta serie tenía marca "↑", precarga el
-         peso de la siguiente fila con +BUMP_INCREMENT_KG kg, SI ESA SIGUIENTE
-         existe, no está cerrada y el usuario NO la ha editado manualmente
-         (userW=false). Marcamos `isBumped=true` para que la CSS la resalte
-         hasta que el usuario la toque. */
-      if (row.bump) {
-        const next = state.rows[i + 1];
-        if (next && !next.done && !next.userW) {
-          const baseW = numify(row.weight);
-          if (baseW > 0) {
-            next.weight = +(baseW + BUMP_INCREMENT_KG).toFixed(2);
-            next.isBumped = true;
-          }
-        }
-      }
-
       const sess = persist(state);
       renderSets();
       refreshProgress();
@@ -471,21 +427,10 @@ function buildPage(item, pageIdx) {
     class: 'aw-add', type: 'button',
     onClick: () => {
       const prev = state.rows[state.rows.length - 1];
-      // Si la última serie está marcada con bump, la nueva precarga +2.5 kg
-      // sobre el peso de esa última. Es el caso típico de "estoy en la 4ª y
-      // quiero hacer una 5ª más pesada".
-      const prevW = prev ? numify(prev.weight) : 0;
-      let newW = prev ? prev.weight : baseW;
-      let bumped = false;
-      if (prev && prev.bump && prevW > 0) {
-        newW = +(prevW + BUMP_INCREMENT_KG).toFixed(2);
-        bumped = true;
-      }
       state.rows.push({
-        weight: newW,
+        weight: prev ? prev.weight : baseW,
         reps: prev ? prev.reps : targetReps,
         rpe: '', done: false,
-        isBumped: bumped,
       });
       renderSets();
     },
@@ -498,8 +443,59 @@ function buildPage(item, pageIdx) {
   notes.addEventListener('input', () => { state.notes = notes.value; });
   notes.addEventListener('blur', () => { if (hasSession(ex.id)) persist(state); });
 
+  /* === Override de carga para la PRÓXIMA sesión ===
+     UI: strip horizontal con label "Próxima sesión" + ▲ subir / ▼ bajar.
+     Comportamiento:
+       - 1 tap en ▲ → 'up'.   2º tap → cancela (vuelve a null).
+       - 1 tap en ▼ → 'down'. 2º tap → cancela.
+       - Tapar el opuesto del actual → cambia de dirección.
+     El estado se persiste via persist() → se guarda con la session log,
+     y suggestNextWeight lo lee al calcular la sugerencia para mañana. */
+  const overrideStrip = h('div', { class: 'aw-override' });
+
+  function renderOverride() {
+    const v = state.nextOverride;
+    overrideStrip.innerHTML = '';
+    overrideStrip.append(
+      h('span', { class: 'awo-label' }, 'Próxima sesión'),
+      h('span', { class: 'awo-spacer' }),
+      h('button', {
+        class: 'awo-arrow awo-up' + (v === 'up' ? ' on' : ''),
+        type: 'button',
+        title: 'Forzar +peso en la próxima sesión',
+        'aria-label': v === 'up'
+          ? 'Quitar forzado de subida'
+          : 'Forzar subida de peso en la próxima sesión',
+        'aria-pressed': v === 'up' ? 'true' : 'false',
+        onClick: () => setOverride(v === 'up' ? null : 'up'),
+      }, '▲'),
+      h('button', {
+        class: 'awo-arrow awo-down' + (v === 'down' ? ' on' : ''),
+        type: 'button',
+        title: 'Forzar -peso en la próxima sesión (descarga)',
+        'aria-label': v === 'down'
+          ? 'Quitar forzado de bajada'
+          : 'Forzar bajada de peso en la próxima sesión',
+        'aria-pressed': v === 'down' ? 'true' : 'false',
+        onClick: () => setOverride(v === 'down' ? null : 'down'),
+      }, '▼'),
+    );
+  }
+
+  function setOverride(value) {
+    state.nextOverride = value;
+    renderOverride();
+    // Si ya hay session persistida (hay al menos una serie done) actualiza
+    // el log al instante. Si no, la marca queda en memoria y se persistirá
+    // al cerrar la primera serie. Sin sets done → persist es no-op.
+    persist(state);
+  }
+
+  renderOverride();
+
   el.append(
     head,
+    overrideStrip,
     setsHost,
     addBtn,
     h('div', { class: 'aw-notes-wrap' }, notes),

@@ -97,8 +97,23 @@ export function suggestNextWeight(sessions, repRange, targetSets, exercise) {
   if (!work.length) return topSet(last)?.weight ?? null;
 
   const workW = work[0].weight;
-  if (metTargetStrict(last, repRange, targetSets)) {
-    return Math.round((workW + bumpKgFor(exercise)) * 2) / 2;
+  const bump  = bumpKgFor(exercise);
+
+  /* === Override manual del usuario (Human-in-the-loop) ===
+     Si en la última sesión se marcó nextOverride='up' o 'down', ese flag
+     puentea la lógica automática de double-progression. Es la palanca
+     consciente: "yo decido qué peso quiero la próxima vez, independiente
+     de si cumplí o no el rango de reps". */
+  if (last.nextOverride === 'up') {
+    return Math.round((workW + bump) * 2) / 2;
   }
-  return workW; // mantener, NO bajar
+  if (last.nextOverride === 'down') {
+    return Math.max(0, Math.round((workW - bump) * 2) / 2);
+  }
+
+  // Lógica automática estándar: solo sube si cumplió rango estricto.
+  if (metTargetStrict(last, repRange, targetSets)) {
+    return Math.round((workW + bump) * 2) / 2;
+  }
+  return workW; // mantener, NO bajar (sería decisión del usuario)
 }

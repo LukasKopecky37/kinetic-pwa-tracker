@@ -119,12 +119,12 @@ body.aw-open .rest-panel { display: none !important; }
 
 /* Cabecera de columnas: una sola vez, alineada con la grid de la fila.
    (Adiós a los labels flotantes que se superponían entre filas.)
-   7 columnas: n · kg · reps · rpe · bump↑ · check · del */
+   6 columnas: n · kg · reps · rpe · check · del */
 .aw-set-head,
 .aw-set {
   display: grid;
-  grid-template-columns: 28px minmax(0,1fr) minmax(0,1fr) 56px 28px 50px 22px;
-  gap: 6px; align-items: center;
+  grid-template-columns: 28px minmax(0,1fr) minmax(0,1fr) 56px 50px 22px;
+  gap: 8px; align-items: center;
 }
 .aw-set-head { padding: 0 10px 2px; }
 .aw-set-head span {
@@ -508,61 +508,62 @@ body.aw-open .rest-panel { display: none !important; }
 }
 
 /* ============================================================================
-   BUMP TOGGLE · "subir peso en la siguiente serie"
+   OVERRIDE de carga para la PRÓXIMA SESIÓN · "Next Workout Override"
    ----------------------------------------------------------------------------
-   Pequeño botón con flecha ↑ entre RPE y check. Estado off = borde tenue +
-   color muted. Estado on = fondo naranja translúcido + halo accent → señala
-   visualmente que la próxima serie llevará un incremento automático.
-   El estado es per-sesión (transient: vive en row.bump, no persiste al Store).
+   Strip horizontal debajo del head del ejercicio. Label compacto "Próxima
+   sesión" + dos flechas minimalistas ▲ / ▼.
+     - ▲ on  → fondo accent naranja, halo glow → "forzar progreso"
+     - ▼ on  → fondo muted warm tint → "forzar regresión controlada"
+   Estado mutually-exclusive (solo una puede estar on). Tap doble cancela.
    ============================================================================ */
-.aw-bump {
-  width: 28px; height: 28px;
+.aw-override {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 0 6px;
+  padding: 8px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 40px;
+}
+.awo-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.awo-spacer { flex: 1; }
+.awo-arrow {
+  width: 32px; height: 32px;
   background: transparent;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--muted);
-  font-size: 14px; font-weight: 800;
+  font-size: 13px; font-weight: 800;
   cursor: pointer;
   font-family: inherit;
   display: inline-flex; align-items: center; justify-content: center;
   line-height: 1;
-  transition: background .15s, border-color .15s, color .15s, transform .12s, box-shadow .2s;
+  transition: background .15s, border-color .15s, color .15s,
+              transform .12s, box-shadow .2s;
 }
-.aw-bump:hover {
-  border-color: var(--accent);
-  color: var(--accent-2);
-}
-.aw-bump.on {
+.awo-arrow:hover { border-color: rgba(255,255,255,.18); color: var(--text-2); }
+.awo-arrow:active { transform: scale(.92); }
+
+/* ▲ activado → progreso forzado (acento naranja saturado) */
+.awo-up.on {
   background: rgba(255,107,0,.16);
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(255,107,0,.4), 0 4px 10px rgba(255,107,0,.18);
+  box-shadow:
+    0 0 0 1px rgba(255,107,0,.4),
+    0 4px 12px rgba(255,107,0,.22);
 }
-.aw-bump:disabled {
-  opacity: .35;
-  cursor: default;
-}
-.aw-bump:active { transform: scale(.9); }
-/* Fila completada con bump activado: mantenemos el indicador con menos
-   intensidad — el set ya está cerrado pero la marca informa que la
-   siguiente serie ya cogió el incremento. */
-.aw-set.is-completed .aw-bump.on {
-  opacity: .75;
-  box-shadow: none;
-}
-
-/* === Estado "fila recién auto-bumpeada" ===
-   Cuando el sistema pre-carga el KG de una serie con el incremento (porque
-   la serie anterior estaba marcada con bump), la fila se ilumina sutilmente
-   con un pulso naranja en el input de peso → comunica al usuario "este
-   valor lo puse yo, edítalo si quieres". El pulso se queda hasta que el
-   usuario toca el input (input event → JS retira la clase). */
-.aw-set.is-bumped .aw-w {
-  background: rgba(255,107,0,.08);
-  border-color: rgba(255,107,0,.35);
-  animation: aw-bump-flash .9s ease-out;
-}
-@keyframes aw-bump-flash {
-  0%   { box-shadow: 0 0 0 0 rgba(255,107,0,.5); }
-  100% { box-shadow: 0 0 0 10px rgba(255,107,0,0); }
+/* ▼ activado → regresión deliberada (muted warm/amber, sin alarma) */
+.awo-down.on {
+  background: rgba(255,164,92,.10);
+  border-color: rgba(255,164,92,.45);
+  color: var(--accent-2);
+  box-shadow: 0 0 0 1px rgba(255,164,92,.28);
 }
