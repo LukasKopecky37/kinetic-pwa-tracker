@@ -97,12 +97,30 @@ function computeOrder(exId) {
 function persist(state) {
   const doneSets = state.rows
     .filter(r => r.done)
-    .map(r => ({
-      weight: numify(r.weight),
-      reps: intify(r.reps),
-      ...(r.rpe != null && r.rpe !== '' && !isNaN(parseFloat(r.rpe))
-        ? { rpe: parseFloat(r.rpe) } : {}),
-    }))
+    .map(r => {
+      const out = {
+        weight: numify(r.weight),
+        reps: intify(r.reps),
+      };
+      if (r.rpe != null && r.rpe !== '' && !isNaN(parseFloat(r.rpe))) {
+        out.rpe = parseFloat(r.rpe);
+      }
+      // === Persistencia del modo "Manos separadas" ===
+      // Escribimos repsL/repsR si EITHER se ha rellenado (independiente del
+      // flag actual). Eso preserva los datos históricos aunque el usuario
+      // luego desactive split. La invariante `reps = repsL + repsR` se
+      // mantiene → toda la analítica existente sigue funcionando sin tocar.
+      const L = intify(r.repsL);
+      const R = intify(r.repsR);
+      const hasL = Number.isFinite(L) && L >= 0 && r.repsL !== '';
+      const hasR = Number.isFinite(R) && R >= 0 && r.repsR !== '';
+      if (hasL || hasR) {
+        out.repsL = hasL ? L : 0;
+        out.repsR = hasR ? R : 0;
+        out.reps  = out.repsL + out.repsR;
+      }
+      return out;
+    })
     .filter(s => s.weight > 0 && s.reps > 0);
 
   Store.removeSessionFor(date, state.ex.id);
@@ -201,17 +219,24 @@ function buildPage(item, pageIdx) {
   const plannedN   = item.sets || 3;
 
   // Filas iniciales
+  // En modo SPLIT (manos separadas) las series guardan también `repsL` y
+  // `repsR`. `reps` se mantiene como SUMA para que toda la analítica
+  // existente (volume, PR, 1RM, etc.) siga funcionando sin tocar nada.
   let rows;
   if (todayDone && (todayDone.sets || []).length) {
     rows = todayDone.sets.map(s => ({
-      weight: s.weight, reps: s.reps, rpe: s.rpe ?? '', done: true,
+      weight: s.weight, reps: s.reps,
+      repsL: s.repsL ?? '', repsR: s.repsR ?? '',
+      rpe: s.rpe ?? '', done: true,
     }));
     for (let i = rows.length; i < plannedN; i++) {
-      rows.push({ weight: baseW, reps: targetReps, rpe: '', done: false });
+      rows.push({ weight: baseW, reps: targetReps,
+                  repsL: '', repsR: '', rpe: '', done: false });
     }
   } else {
     rows = Array.from({ length: plannedN }, () => ({
-      weight: baseW, reps: targetReps, rpe: '', done: false,
+      weight: baseW, reps: targetReps,
+      repsL: '', repsR: '', rpe: '', done: false,
     }));
   }
 
@@ -225,6 +250,14 @@ function buildPage(item, pageIdx) {
        Se persiste en la session log → la lee `suggestNextWeight` cuando el
        generador construye la próxima sesión de este ejercicio. */
     nextOverride: todayDone?.nextOverride || null,
+    /* === Modo "Manos separadas" (unilateral split) ===
+       Boolean per-ejercicio (no per-sesión): persistido en exercises[].
+       Cuando true:
+         - rowEl renderiza dos mini-steppers (L | R) en vez de uno
+         - headRow muestra columnas "KG | L | R" (RPE oculto)
+         - persist() escribe repsL + repsR + reps=L+R en cada set
+         - validación: la suma L+R > 0 para marcar ✓ done */
+    split: !!ex.unilateralSplit,
     prCelebrated: false,
   };
 
@@ -270,15 +303,28 @@ function buildPage(item, pageIdx) {
   const setsHost = h('div', { class: 'aw-sets' });
 
   // Cabecera de columnas (una sola vez, alineada con la grid de la fila).
-  // 6 spans para 6 columnas: n · kg · reps · rpe · check · del.
-  const headRow = () => h('div', { class: 'aw-set-head' },
-    h('span', null, ''),
-    h('span', null, 'KG'),
-    h('span', null, 'REPS'),
-    h('span', null, 'RPE'),
-    h('span', null, ''),
-    h('span', null, ''),
-  );
+  //   - Normal: 6 cols → n · KG · REPS · RPE · check · del
+  //   - Split:  6 cols → n · KG · L · R · check · del (RPE oculto)
+  const headRow = () => {
+    if (state.split) {
+      return h('div', { class: 'aw-set-head split' },
+        h('span', null, ''),
+        h('span', null, 'KG'),
+        h('span', null, 'L'),
+        h('span', null, 'R'),
+        h('span', null, ''),
+        h('span', null, ''),
+      );
+    }
+    return h('div', { class: 'aw-set-head' },
+      h('span', null, ''),
+      h('span', null, 'KG'),
+      h('span', null, 'REPS'),
+      h('span', null, 'RPE'),
+      h('span', null, ''),
+      h('span', null, ''),
+    );
+  };
 
   /**
    * Módulo 3 — Autofill: al teclear KG en una serie y NO haber historial
@@ -322,14 +368,21 @@ function buildPage(item, pageIdx) {
   /* Stepper [- N +] para reps: sin teclado nativo en el gym. Smart default:
    * si la celda no tiene valor y se pulsa por primera vez, salta al límite
    * inferior del rango objetivo (12-15 → 12); después ±1. Además marca la
-   * fila como `is-under` si el valor queda por debajo del mínimo (aviso). */
-  function repsStepper(row) {
+   * fila como `is-under` si el valor queda por debajo del mínimo (aviso).
+   *
+   * Parámetro `key` permite reutilizar el stepper para reps unificado
+   * ('reps') o para los dos lados en modo split ('repsL', 'repsR').
+   * Parámetro `extra` añade clase CSS (ej. 'aw-stepper-mini' para split). */
+  function repsStepper(row, key = 'reps', extra = '') {
     const display = () =>
-      row.reps === '' || row.reps == null ? '—' : String(row.reps);
+      row[key] === '' || row[key] == null ? '—' : String(row[key]);
     const val = h('div', { class: 'aw-step-val' }, display());
-    const wrap = h('div', { class: 'aw-stepper' });
+    const wrap = h('div', { class: 'aw-stepper' + (extra ? ' ' + extra : '') });
 
     const refreshUnder = () => {
+      // Solo el stepper unificado dispara el aviso `is-under` (en split
+      // mode el cálculo "bajo del mínimo" no aplica per-side cleanly).
+      if (key !== 'reps') return;
       const cur = parseInt(row.reps, 10);
       const under = !!(targetReps && cur > 0 && cur < targetReps);
       const setRow = wrap.closest('.aw-set');
@@ -338,9 +391,9 @@ function buildPage(item, pageIdx) {
 
     const bump = (delta) => {
       if (row.done) return;
-      const cur = parseInt(row.reps, 10);
-      if (!Number.isFinite(cur)) row.reps = targetReps || 1;     // 1ª pulsación → al target
-      else                       row.reps = Math.max(1, cur + delta);
+      const cur = parseInt(row[key], 10);
+      if (!Number.isFinite(cur)) row[key] = targetReps || 1;
+      else                       row[key] = Math.max(0, cur + delta);
       val.textContent = display();
       refreshUnder();
     };
@@ -368,17 +421,22 @@ function buildPage(item, pageIdx) {
     const isNext = !row.done && i === firstUndone;
     const curReps = parseInt(row.reps, 10);
     const under = !!(targetReps && curReps > 0 && curReps < targetReps);
-    return h('div', {
-      class: 'aw-set'
-        + (row.done ? ' is-completed' : '')
-        + (isNext ? ' next' : '')
-        + (under ? ' is-under' : ''),
-      dataset: { i: String(i) },
-    },
+    const baseEls = [
       h('div', { class: 'aw-set-n' }, String(i + 1)),
       weightField(row, i),
-      repsStepper(row),
-      field('aw-rpe', 'rpe', row, i, 'decimal'),
+    ];
+    const midEls = state.split
+      ? [
+          // Split mode: dos mini-steppers L | R, RPE oculto
+          repsStepper(row, 'repsL', 'aw-stepper-mini'),
+          repsStepper(row, 'repsR', 'aw-stepper-mini'),
+        ]
+      : [
+          // Normal: un stepper de reps + input de RPE
+          repsStepper(row, 'reps'),
+          field('aw-rpe', 'rpe', row, i, 'decimal'),
+        ];
+    const tailEls = [
       h('button', {
         class: 'aw-check', type: 'button',
         'aria-label': row.done ? 'Reabrir serie' : 'Marcar serie completada',
@@ -388,7 +446,16 @@ function buildPage(item, pageIdx) {
         class: 'aw-set-del', type: 'button', 'aria-label': 'Quitar serie',
         onClick: () => removeRow(i),
       }, '×'),
-    );
+    ];
+
+    return h('div', {
+      class: 'aw-set'
+        + (state.split ? ' split' : '')
+        + (row.done ? ' is-completed' : '')
+        + (isNext ? ' next' : '')
+        + (under ? ' is-under' : ''),
+      dataset: { i: String(i) },
+    }, ...baseEls, ...midEls, ...tailEls);
   }
 
   /**
@@ -448,9 +515,24 @@ function buildPage(item, pageIdx) {
     const row = state.rows[i];
     clearTimeout(persistT);   // cancela un persist debounced en vuelo
     if (!row.done) {
-      const w = numify(row.weight), reps = intify(row.reps);
-      if (!(w > 0) || !(reps > 0)) {
-        toast('Pon peso y reps en la serie', 'bad');
+      const w = numify(row.weight);
+      // En split mode la "validación de reps" es L+R > 0. Un lado a 0 está
+      // permitido (entrenamiento asimétrico real). En modo normal usamos
+      // el campo único reps como siempre.
+      let totalReps;
+      if (state.split) {
+        const L = intify(row.repsL), R = intify(row.repsR);
+        const Ln = Number.isFinite(L) ? L : 0;
+        const Rn = Number.isFinite(R) ? R : 0;
+        totalReps = Ln + Rn;
+        row.reps = totalReps;   // mantiene reps como suma para analytics
+      } else {
+        totalReps = intify(row.reps);
+      }
+      if (!(w > 0) || !(totalReps > 0)) {
+        toast(state.split
+          ? 'Pon peso y reps en al menos un lado'
+          : 'Pon peso y reps en la serie', 'bad');
         return;
       }
       row.done = true;
@@ -579,9 +661,16 @@ function buildPage(item, pageIdx) {
 
   renderOverride();
 
+  /* === Toggle "Manos separadas" ===
+     Solo visible si el equipamiento del ejercicio admite trabajo
+     unilateral o si el usuario ya lo activó manualmente alguna vez
+     (preserva su elección en ejercicios custom). */
+  const splitToggle = canSplitSides(ex) ? buildSplitToggleStrip(ex, state, renderSets) : null;
+
   el.append(
     head,
     overrideStrip,
+    ...(splitToggle ? [splitToggle] : []),
     setsHost,
     addBtn,
     h('div', { class: 'aw-notes-wrap' }, notes),
@@ -591,6 +680,54 @@ function buildPage(item, pageIdx) {
     el, ex, item, state,
     refresh() { renderSets(); },
   };
+}
+
+/* === Helpers del modo "Manos separadas" === */
+
+/** Equipos que típicamente admiten trabajo unilateral asimétrico. */
+const UNILATERAL_EQUIPMENT = new Set([
+  'Mancuernas',     // 1 mancuerna por mano → un brazo puede fallar antes
+  'Polea',          // unilateral con polea → un brazo a la vez
+]);
+
+/** ¿Tiene sentido mostrar el toggle "Manos separadas" para este ejercicio?
+ *  Sí si el equipo es unilateral-friendly O si el flag ya está activo
+ *  (preserva la elección del usuario aunque cambien el equipamiento). */
+function canSplitSides(ex) {
+  if (!ex) return false;
+  if (ex.unilateralSplit) return true;
+  return ex.equipment && UNILATERAL_EQUIPMENT.has(ex.equipment);
+}
+
+/** Construye el strip horizontal con label + switch iOS-style. El switch
+ *  alterna `state.split` Y persiste en `exercise.unilateralSplit` para que
+ *  la próxima sesión del mismo ejercicio cargue con la misma configuración.
+ *  Al cambiar de modo dispara un re-render del sets host (la grid y los
+ *  inputs cambian) preservando los valores en memoria de cada fila. */
+function buildSplitToggleStrip(ex, state, onRender) {
+  const strip = h('div', { class: 'aw-split-toggle' });
+  const switchBtn = h('button', {
+    class: 'aw-switch' + (state.split ? ' on' : ''),
+    type: 'button',
+    'aria-pressed': state.split ? 'true' : 'false',
+    'aria-label': 'Activar / desactivar modo manos separadas',
+    onClick: () => {
+      state.split = !state.split;
+      Store.updateExercise(ex.id, { unilateralSplit: state.split });
+      switchBtn.classList.toggle('on', state.split);
+      switchBtn.setAttribute('aria-pressed', state.split ? 'true' : 'false');
+      if (onRender) onRender();   // re-render del sets host con la nueva grid
+    },
+  });
+  strip.append(
+    h('div', { class: 'awst-label' },
+      'Manos separadas',
+      h('span', { class: 'awst-help' },
+        'Registra reps por brazo cuando uno falla antes que el otro'),
+    ),
+    switchBtn,
+  );
+  return strip;
 }
 
 /* ============================================================================
