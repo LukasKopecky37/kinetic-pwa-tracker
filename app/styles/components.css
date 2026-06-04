@@ -68,14 +68,20 @@
    calculadora de discos (⚖) como columna propia (no embebida en el input). */
 .sets-list-head{
   display:grid;
-  grid-template-columns:22px 1fr 1fr 64px 26px;
+  /* minmax(0,1fr) en vez de 1fr puro · IMPORTANTE: sin el min-content de 0
+     explícito, los tracks 1fr se NIEGAN a encogerse por debajo del ancho
+     intrínseco del input + padding + valor numérico ("132,5"). En viewports
+     estrechos (iPhone SE en portrait, PWA mode con barras del SO) eso forzaba
+     overflow horizontal del RPE hacia fuera del modal. minmax(0,…) le permite
+     a Grid encoger las columnas → las 5 columnas siempre caben. */
+  grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 64px 26px;
   gap:6px; align-items:center;
   padding:0 8px;
   margin:14px 0 6px;
 }
 .sets-list-head.has-plate,
 .set-row.has-plate{
-  grid-template-columns:22px 1fr 30px 1fr 64px 26px;
+  grid-template-columns:22px minmax(0,1fr) 30px minmax(0,1fr) 64px 26px;
 }
 .sets-list-head > span{
   font-size:10px; font-weight:700;
@@ -86,7 +92,10 @@
 
 .set-row{
   display:grid;
-  grid-template-columns:22px 1fr 1fr 64px 26px;
+  /* Misma defensa que .sets-list-head: minmax(0,1fr) garantiza que las
+     columnas KG y REPS se encojan proporcionalmente cuando el modal queda
+     estrecho, en vez de empujar a RPE fuera del viewport derecho. */
+  grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 64px 26px;
   gap:6px; align-items:center;
   background:var(--panel-2); border:1px solid var(--line);
   border-radius:var(--radius-sm); padding:11px 8px;
