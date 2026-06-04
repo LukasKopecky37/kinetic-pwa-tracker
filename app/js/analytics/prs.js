@@ -43,19 +43,68 @@ export function topSet(session) {
   return best;
 }
 
+/** Mejor set por VOLUMEN (peso × reps). El criterio "peso x reps" del
+ *  requerimiento PR — un 60kg×12 (=720) cuenta como mejor set que un
+ *  60kg×10 (=600) AUNQUE el peso máximo no haya subido. */
+export function bestSetVolume(session) {
+  let top = 0;
+  for (const set of (session?.sets || [])) {
+    if (set.warmup) continue;
+    if (!set.reps) continue;
+    const v = (set.weight || 0) * set.reps;
+    if (v > top) top = v;
+  }
+  return top;
+}
+
+/** Volumen total de la sesión: Σ(peso × reps) de todos los work-sets. */
+export function sessionTotalVolume(session) {
+  let total = 0;
+  for (const set of (session?.sets || [])) {
+    if (set.warmup) continue;
+    if (!set.reps) continue;
+    total += (set.weight || 0) * set.reps;
+  }
+  return total;
+}
+
 /**
- * ¿Es PR de peso esta sesión? Comparada con todas las sesiones del mismo
- * ejercicio ≤ su fecha (excluyéndose ella misma).
+ * ¿Es PR esta sesión? Comparada con todas las sesiones del mismo ejercicio
+ * ≤ su fecha (excluyéndose ella misma).
+ *
+ * Devuelve true si CUALQUIERA de estas 3 métricas es ESTRICTAMENTE mayor
+ * que el récord previo:
+ *   1. Peso máximo (top set) — el clásico
+ *   2. Mejor set por volumen (peso × reps de un solo set) — usuario rompe
+ *      el récord en una serie de "máximo esfuerzo concentrado"
+ *   3. Volumen total de la sesión (Σ peso × reps) — el usuario suma más
+ *      trabajo acumulado que en cualquier sesión previa
+ *
+ * Razón: el usuario percibe como "PR" cualquiera de los tres. Limitarlo
+ * al peso máximo apagaba el dopamine loop cuando el atleta hacía más reps
+ * al mismo peso (mejorando volumen) sin subir la barra.
  *
  * @param {{id:number|string, date:string, sets:Array}} session
  * @param {Array<object>} exerciseSessions
  * @returns {boolean}
  */
 export function isPR(session, exerciseSessions) {
-  const sessionTop = topWeight(session);
-  if (sessionTop <= 0) return false;
-  const prev = exerciseSessions.filter(
+  if (!session?.sets?.length) return false;
+  const prev = (exerciseSessions || []).filter(
     x => x.id !== session.id && x.date <= session.date
   );
-  return prev.every(p => topWeight(p) < sessionTop);
+
+  // Métrica 1: peso máximo (top set)
+  const w  = topWeight(session);
+  if (w > 0 && prev.every(p => topWeight(p) < w)) return true;
+
+  // Métrica 2: mejor set por volumen (peso × reps de UN set)
+  const bv = bestSetVolume(session);
+  if (bv > 0 && prev.every(p => bestSetVolume(p) < bv)) return true;
+
+  // Métrica 3: volumen total de la sesión (Σ peso × reps)
+  const tv = sessionTotalVolume(session);
+  if (tv > 0 && prev.every(p => sessionTotalVolume(p) < tv)) return true;
+
+  return false;
 }
