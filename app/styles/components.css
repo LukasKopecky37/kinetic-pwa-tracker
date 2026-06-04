@@ -437,3 +437,240 @@
   background:linear-gradient(to bottom,#374151,#1f2937,#374151);
   border-radius:2px;
 }
+
+/* ============================================================================
+   PICKER DE EJERCICIOS · rediseño Bento + multi-select + sticky CTA
+   ----------------------------------------------------------------------------
+   Reemplaza el antiguo flujo de "1 ejercicio por tap → cierra el picker".
+   Ahora el usuario marca varios y los añade en lote desde el footer sticky.
+   ============================================================================ */
+
+/* Contenedor del body: deja aire abajo para que la sticky bar no tape contenido. */
+.pick-body{
+  padding-bottom:6px;
+  display:flex; flex-direction:column; gap:10px;
+}
+
+/* Botón "+ Crear personalizado" — secundario respecto a la búsqueda. */
+.pick-new{
+  width:100%;
+  background:var(--accent); color:#1a0a00; border:0;
+  border-radius:12px; padding:12px;
+  font-size:13px; font-weight:800; letter-spacing:.2px;
+  cursor:pointer;
+}
+.pick-new:active{ transform:scale(.99); }
+
+/* Input de búsqueda — anchor principal del header. */
+.pick-search{
+  width:100%;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:11px 14px;
+  border-radius:12px;
+  font-size:14px;
+  outline:none;
+  transition:border-color .15s;
+}
+.pick-search:focus{ border-color:var(--accent); }
+.pick-search::placeholder{ color:var(--muted); }
+
+/* Bento grid de grupos musculares · 2 columnas */
+.pick-bento{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  align-items:start;
+}
+/* Card desplegada → ocupa fila completa (efecto premium tipo iOS) */
+.pg-card{
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:14px;
+  overflow:hidden;
+  transition:border-color .18s, background .18s;
+}
+.pg-card.open{
+  grid-column:1 / -1;
+  border-color:rgba(255,107,0,.28);
+}
+.pg-card.has-sel{ border-color:var(--accent); }
+
+.pg-head{
+  width:100%;
+  background:transparent; border:0;
+  text-align:left; color:var(--text);
+  padding:14px 36px 14px 14px;
+  display:flex; flex-direction:column; gap:3px;
+  position:relative;
+  cursor:pointer;
+  font-family:inherit;
+}
+.pg-head:hover{ background:rgba(255,255,255,.02); }
+.pg-name{
+  font-size:14px; font-weight:700;
+  letter-spacing:-0.1px;
+}
+.pg-meta{
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:.2px;
+  display:flex; align-items:center; gap:6px;
+}
+.pg-badge{
+  display:inline-block;
+  background:var(--accent); color:#1a0a00;
+  font-weight:800; font-size:10px;
+  padding:1px 7px;
+  border-radius:999px;
+  letter-spacing:.3px;
+}
+.pg-chev{
+  position:absolute; right:12px; top:50%;
+  transform:translateY(-50%);
+  color:var(--accent);
+  font-size:18px; line-height:1;
+  transition:transform .25s ease;
+}
+.pg-card.open .pg-chev{
+  transform:translateY(-50%) rotate(90deg);
+}
+
+.pg-body{
+  max-height:0;
+  overflow:hidden;
+  transition:max-height .3s ease;
+}
+.pg-card.open .pg-body{
+  max-height:2400px; /* suficiente para el grupo más poblado */
+  border-top:1px solid var(--line);
+}
+
+/* Lista plana (modo búsqueda) */
+.pick-flat{
+  display:flex; flex-direction:column;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:14px;
+  overflow:hidden;
+}
+
+.pick-count{
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:.6px;
+  text-transform:uppercase;
+  font-weight:700;
+  padding:4px 4px 2px;
+}
+
+/* Una fila de ejercicio (igual en flat y dentro de la card) */
+.pick-row{
+  display:flex; align-items:center; gap:10px;
+  padding:11px 14px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  transition:background .12s;
+}
+.pick-row:last-child{ border-bottom:0; }
+.pick-row:hover{ background:rgba(255,255,255,.025); }
+
+/* Estado seleccionado: borde acento a la izquierda + tinte sutil */
+.pick-row.on{
+  background:rgba(255,107,0,.07);
+  box-shadow:inset 3px 0 0 var(--accent);
+}
+
+.pr-info{ flex:1; min-width:0; }
+.pr-name{
+  font-size:13px; font-weight:600;
+  color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pr-name .badge{
+  display:inline-block;
+  background:rgba(52,211,153,.14);
+  color:#34d399;
+  font-size:10px; font-weight:700;
+  padding:1px 7px;
+  border-radius:6px;
+  margin-left:6px;
+  letter-spacing:.2px;
+}
+.pr-meta{
+  font-size:11px; color:var(--muted);
+  margin-top:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Toggle [+] / [✓] · cambia de outline a sólido al seleccionar */
+.pr-toggle{
+  width:34px; height:34px;
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:var(--accent-2);
+  font-size:17px; font-weight:800;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:background .15s, border-color .15s, color .15s, transform .12s;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.pr-toggle:hover{ border-color:var(--accent); }
+.pr-toggle.on{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#1a0a00;
+  box-shadow:0 4px 12px rgba(255,107,0,.28);
+}
+.pr-toggle:active{ transform:scale(.92); }
+
+.pick-empty{
+  padding:32px 16px;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+}
+
+/* === Sticky footer del modal del picker ===
+   El .modal-foot original es un footer normal en flujo. Lo reciclamos como
+   "barra de acción premium" con padding ampliado, gradiente sutil para que
+   el contenido scrolleado se difumine debajo, y safe-area-inset-bottom para
+   iPhone con notch en horizontal. */
+.modal-foot.pick-foot{
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      rgba(15,17,21,.55) 20%,
+      var(--panel) 70%);
+  border-top:1px solid var(--line);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+}
+.pick-cta{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px;
+  font-size:14px; font-weight:800;
+  letter-spacing:.3px;
+  cursor:pointer;
+  font-family:inherit;
+  transition:background .25s, color .25s, border-color .25s,
+             box-shadow .25s, transform .12s;
+}
+/* "‹ Volver" — secundario, neutro */
+.pick-cta.off{
+  background:var(--panel-2);
+  color:var(--text);
+}
+/* "Añadir N ejercicios" — primario, acento */
+.pick-cta.on{
+  background:var(--accent);
+  color:#1a0a00;
+  border-color:var(--accent);
+  box-shadow:0 8px 22px rgba(255,107,0,.28);
+}
+.pick-cta:active{ transform:scale(.985); }

@@ -399,37 +399,42 @@ function openLibraryPicker(routineId) {
     });
   });
 
-  const state = { q: '', muscle: '', equip: '' };
-
-  const chipRow = (id, values) => `
-    <div class="pick-frow" id="${id}">
-      <button class="day-chip on" data-v="">Todos</button>
-      ${values.map(v => `<button class="day-chip" data-v="${escapeH(v)}">${escapeH(v)}</button>`).join('')}
-    </div>`;
+  /* === Rediseño UX/UI (Bento + multi-select + sticky CTA) ===================
+   * State:
+   *   - q:        query de búsqueda; si != '' renderizamos flat list, si '' bento
+   *   - expanded: Set<groupName> de cards desplegadas (acordeón multi-abierto)
+   *   - selected: Set<exerciseId> seleccionados → CTA inferior los añade en lote
+   * Antes: la lista plana forzaba 1 picker abierto por ejercicio añadido.
+   * Ahora: marca todos los que quieras → "Añadir N" → vuelve al editor del día. */
+  const state = {
+    q: '',
+    expanded: new Set(),
+    selected: new Set(),
+  };
 
   openModal(`
-    <div class="modal-head"><h3>Añadir ejercicio</h3><button class="x" id="picBack">×</button></div>
-    <div class="modal-body">
-      <button class="btn small" id="bNewLib" style="width:100%;margin-bottom:12px">
+    <div class="modal-head">
+      <h3>Añadir ejercicios</h3>
+      <button class="x" id="picBack" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modal-body pick-body">
+      <button class="btn small pick-new" id="bNewLib" type="button">
         + Crear ejercicio personalizado
       </button>
-      <input type="text" class="picker-search" id="pickSearch" placeholder="Buscar por nombre…"
-             style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);padding:10px 12px;border-radius:10px;width:100%">
-      <div class="pick-filters">
-        <div class="pick-flabel">Grupo muscular</div>
-        ${chipRow('fMuscle', CATALOG_MUSCLES)}
-        <div class="pick-flabel">Equipamiento</div>
-        ${chipRow('fEquip', CATALOG_EQUIPMENT)}
-      </div>
-      <div id="pickCount" class="pick-flabel" style="margin:6px 0 4px"></div>
-      <div id="pickList"></div>
+      <input type="text" class="pick-search" id="pickSearch"
+             placeholder="Buscar por nombre…"
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             aria-label="Buscar ejercicio por nombre">
+      <div id="pickContent"></div>
     </div>
-    <div class="modal-foot"><button class="btn secondary" id="bPicBack2">‹ Volver</button></div>
+    <div class="modal-foot pick-foot">
+      <button class="pick-cta off" id="picCTA" type="button">‹ Volver</button>
+    </div>
   `);
 
   const back = () => openRoutineEditor(routineId);
   $('#picBack').addEventListener('click', back);
-  $('#bPicBack2').addEventListener('click', back);
+
   // Req 3: al crear un ejercicio propio se inserta SOLO en el día activo
   // (cero clics extra) y volvemos al editor del día. Cancelar → al picker.
   $('#bNewLib').addEventListener('click', () =>
@@ -446,66 +451,136 @@ function openLibraryPicker(routineId) {
       },
     ));
 
-  function add(entry) {
-    if (!entry.custom && !Store.exerciseById(entry.id)) {
-      Store.addExerciseFromCatalog(entry.id);
+  $('#pickSearch').addEventListener('input', (e) => {
+    state.q = e.target.value;
+    renderContent();
+  });
+
+  $('#picCTA').addEventListener('click', () => {
+    if (state.selected.size === 0) back();
+    else commitBatch();
+  });
+
+  function rowHTML(e) {
+    const sel = state.selected.has(e.id);
+    return `
+      <div class="pick-row ${sel ? 'on' : ''}" data-id="${escapeH(e.id)}">
+        <div class="pr-info">
+          <div class="pr-name">${escapeH(e.name)}${e.inLib ? ' <span class="badge">en biblioteca</span>' : ''}</div>
+          <div class="pr-meta">${escapeH(e.muscle)} · ${escapeH(e.equipment)} · ${e.sets}×${escapeH(e.repRange)}</div>
+        </div>
+        <button class="pr-toggle ${sel ? 'on' : ''}" type="button"
+                aria-label="${sel ? 'Quitar de la selección' : 'Añadir a la selección'}">${sel ? '✓' : '+'}</button>
+      </div>`;
+  }
+
+  function cardHTML(group, items) {
+    const expanded = state.expanded.has(group);
+    const selectedInGroup = items.reduce((n, e) => n + (state.selected.has(e.id) ? 1 : 0), 0);
+    return `
+      <div class="pg-card ${expanded ? 'open' : ''} ${selectedInGroup ? 'has-sel' : ''}" data-group="${escapeH(group)}">
+        <button class="pg-head" type="button" aria-expanded="${expanded}">
+          <div class="pg-name">${escapeH(group)}</div>
+          <div class="pg-meta">
+            <span>${items.length} ${items.length === 1 ? 'ejercicio' : 'ejercicios'}</span>
+            ${selectedInGroup ? `<span class="pg-badge">${selectedInGroup}</span>` : ''}
+          </div>
+          <span class="pg-chev" aria-hidden="true">›</span>
+        </button>
+        <div class="pg-body">
+          ${items.map(rowHTML).join('')}
+        </div>
+      </div>`;
+  }
+
+  function renderContent() {
+    const q = fold(state.q.trim());
+    const host = $('#pickContent');
+
+    if (q) {
+      // === Modo búsqueda: flat list cross-grupo ===
+      const filtered = entries.filter(e => fold(e.name).includes(q));
+      host.innerHTML = filtered.length
+        ? `<div class="pick-count">${filtered.length} resultado${filtered.length === 1 ? '' : 's'}</div>
+           <div class="pick-flat">${filtered.map(rowHTML).join('')}</div>`
+        : '<div class="pick-empty">Ningún ejercicio coincide.</div>';
+    } else {
+      // === Modo bento: grupos como tarjetas, acordeón ===
+      const byGroup = new Map();
+      for (const e of entries) {
+        const g = e.muscle || 'Otro';
+        if (!byGroup.has(g)) byGroup.set(g, []);
+        byGroup.get(g).push(e);
+      }
+      // Orden: respeta CATALOG_MUSCLES; los grupos custom (no presentes en el
+      // catálogo, por ejercicios personalizados) van al final, alfabético.
+      const ordered = [
+        ...CATALOG_MUSCLES.filter(m => byGroup.has(m)),
+        ...[...byGroup.keys()].filter(m => !CATALOG_MUSCLES.includes(m)).sort(),
+      ];
+
+      host.innerHTML = ordered.length
+        ? `<div class="pick-bento">${ordered.map(g => cardHTML(g, byGroup.get(g))).join('')}</div>`
+        : '<div class="pick-empty">Sin ejercicios disponibles.</div>';
     }
-    Store.addItemToRoutine(routineId, {
-      exerciseId: entry.id, sets: entry.sets, repRange: entry.repRange,
-      rest: Store.getDefaultRest(), days: [],
+
+    bindContent();
+    renderCTA();
+  }
+
+  function bindContent() {
+    // Tap en una card de grupo → toggle expand/collapse
+    $$('#pickContent .pg-head').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const g = btn.closest('.pg-card').dataset.group;
+        if (state.expanded.has(g)) state.expanded.delete(g);
+        else state.expanded.add(g);
+        renderContent();
+      });
     });
-    toast(`Añadido: ${entry.name}`);
+    // Tap en una row de ejercicio (o en su toggle [+/✓]) → toggle selección
+    $$('#pickContent .pick-row').forEach(row => {
+      row.addEventListener('click', () => toggleSelect(row.dataset.id));
+    });
+  }
+
+  function toggleSelect(id) {
+    if (state.selected.has(id)) state.selected.delete(id);
+    else state.selected.add(id);
+    renderContent();
+  }
+
+  function renderCTA() {
+    const cta = $('#picCTA');
+    const n = state.selected.size;
+    if (n === 0) {
+      cta.className = 'pick-cta off';
+      cta.textContent = '‹ Volver';
+    } else {
+      cta.className = 'pick-cta on';
+      cta.textContent = `Añadir ${n} ejercicio${n === 1 ? '' : 's'}`;
+    }
+  }
+
+  function commitBatch() {
+    let added = 0;
+    for (const id of state.selected) {
+      const entry = entries.find(e => e.id === id);
+      if (!entry) continue;
+      if (!entry.custom && !Store.exerciseById(entry.id)) {
+        Store.addExerciseFromCatalog(entry.id);
+      }
+      Store.addItemToRoutine(routineId, {
+        exerciseId: entry.id, sets: entry.sets, repRange: entry.repRange,
+        rest: Store.getDefaultRest(), days: [],
+      });
+      added++;
+    }
+    toast(`Añadido${added === 1 ? '' : 's'}: ${added} ejercicio${added === 1 ? '' : 's'}`);
     openRoutineEditor(routineId);
   }
 
-  function renderList() {
-    const q = fold(state.q);
-    const filtered = entries.filter(e =>
-      (!q || fold(e.name).includes(q)) &&
-      (!state.muscle || e.muscle === state.muscle) &&
-      (!state.equip  || e.equipment === state.equip));
-
-    $('#pickCount').textContent =
-      `${filtered.length} ejercicio${filtered.length === 1 ? '' : 's'}`;
-
-    $('#pickList').innerHTML = filtered.length
-      ? filtered.map(e => `
-          <div class="picker-row" data-id="${escapeH(e.id)}">
-            <div>
-              <div class="lr-name">${escapeH(e.name)}${e.inLib ? ' <span class="badge">en biblioteca</span>' : ''}</div>
-              <div class="lr-group">${escapeH(e.muscle)} · ${escapeH(e.equipment)} · ${e.sets}×${escapeH(e.repRange)}</div>
-            </div>
-            <div class="mr-arrow">+</div>
-          </div>`).join('')
-      : '<div class="pick-empty">Ningún ejercicio coincide con esos filtros.</div>';
-
-    $$('#pickList .picker-row').forEach(r => {
-      r.addEventListener('click', () => {
-        const entry = filtered.find(e => e.id === r.dataset.id);
-        if (entry) add(entry);
-      });
-    });
-  }
-
-  $('#pickSearch').addEventListener('input', (e) => {
-    state.q = e.target.value;
-    renderList();
-  });
-
-  const bindChips = (rowId, field) => {
-    $$('#' + rowId + ' .day-chip').forEach(c => {
-      c.addEventListener('click', () => {
-        $$('#' + rowId + ' .day-chip').forEach(x => x.classList.remove('on'));
-        c.classList.add('on');
-        state[field] = c.dataset.v;
-        renderList();
-      });
-    });
-  };
-  bindChips('fMuscle', 'muscle');
-  bindChips('fEquip', 'equip');
-
-  renderList();
+  renderContent();
 }
 
 /* ============================================================================
