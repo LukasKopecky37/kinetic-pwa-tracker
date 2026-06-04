@@ -105,8 +105,98 @@ body.aw-open .rest-panel { display: none !important; }
   padding: 6px 0 16px;
 }
 .aw-ex-titles { flex: 1; min-width: 0; }
-.aw-ex-name { font-size: 22px; font-weight: 800; line-height: 1.15; }
+.aw-ex-name-row {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+.aw-ex-name {
+  font-size: 22px; font-weight: 800; line-height: 1.15;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .aw-ex-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+/* === Botón "Notas técnicas" del ejercicio === */
+.aw-ex-tips {
+  position: relative;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--accent-2);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: background .15s, border-color .15s, color .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.aw-ex-tips:hover {
+  background: rgba(255,107,0,.10);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.aw-ex-tips:active { transform: scale(.92); }
+/* Indicador naranja arriba-derecha cuando ya hay notas guardadas. */
+.aw-ex-tips.has-tips {
+  border-color: rgba(255,107,0,.45);
+  color: var(--accent);
+}
+.aw-ex-tips.has-tips::after {
+  content: '';
+  position: absolute;
+  top: -2px; right: -2px;
+  width: 9px; height: 9px;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255,107,0,.6);
+}
+
+/* === Modal de notas técnicas — vive dentro del .modal global === */
+.tips-sub {
+  font-size: 13px;
+  color: var(--accent-2);
+  margin-top: 4px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+}
+.tips-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 12px;
+  line-height: 1.55;
+  letter-spacing: 0.1px;
+}
+.tips-textarea {
+  width: 100%;
+  background: var(--neutral-bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 160px;
+  outline: none;
+  transition: border-color .15s, background .15s;
+  -webkit-appearance: none;
+}
+.tips-textarea:focus {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+.tips-textarea::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
 .aw-ex-last { text-align: right; flex-shrink: 0; font-size: 12px; }
 .aw-last-cap {
   display: block; font-size: 9px; color: var(--muted);

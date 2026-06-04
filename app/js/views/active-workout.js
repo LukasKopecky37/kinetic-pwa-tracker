@@ -34,6 +34,7 @@ function fmtHMS(s) {
 }
 import { RestTimer } from '../services/rest-timer.js';
 import { toast } from '../services/toast.js';
+import { openModal, closeModal } from '../services/modal.js';
 import { vibrate } from '../services/haptics.js';
 import { fireConfetti } from '../services/confetti.js';
 import { confirmFinishWorkout } from './workout.js';
@@ -228,9 +229,31 @@ function buildPage(item, pageIdx) {
   };
 
   // ---- Cabecera del ejercicio ----
+  // Botón "Notas técnicas" (ⓘ) junto al nombre. Indicador naranja
+  // automático si el ejercicio ya tiene notas guardadas en ex.tips.
+  const tipsBtn = h('button', {
+    class: 'aw-ex-tips' + (ex.tips ? ' has-tips' : ''),
+    type: 'button',
+    'aria-label': ex.tips
+      ? 'Notas técnicas del ejercicio (tienes notas guardadas)'
+      : 'Añadir notas técnicas permanentes al ejercicio',
+    title: 'Notas técnicas',
+    onClick: () => openTipsModal(ex, () => {
+      // Tras guardar refrescamos el indicador visual sin re-renderizar
+      // la página entera (mantiene el foco y el scroll del usuario).
+      tipsBtn.classList.toggle('has-tips', !!ex.tips);
+      tipsBtn.setAttribute('aria-label', ex.tips
+        ? 'Notas técnicas del ejercicio (tienes notas guardadas)'
+        : 'Añadir notas técnicas permanentes al ejercicio');
+    }),
+  }, 'ⓘ');
+
   const head = h('div', { class: 'aw-ex-head' },
     h('div', { class: 'aw-ex-titles' },
-      h('div', { class: 'aw-ex-name' }, ex.name),
+      h('div', { class: 'aw-ex-name-row' },
+        h('div', { class: 'aw-ex-name' }, ex.name),
+        tipsBtn,
+      ),
       h('div', { class: 'aw-ex-meta' },
         `${escapeH(ex.group)} · ${item.sets}×${item.repRange} · descanso ${fmtMMSS(restSec)}`),
     ),
@@ -568,6 +591,68 @@ function buildPage(item, pageIdx) {
     el, ex, item, state,
     refresh() { renderSets(); },
   };
+}
+
+/* ============================================================================
+   Notas técnicas permanentes del ejercicio
+   ----------------------------------------------------------------------------
+   Pop-up que escribe a `exercise.tips` (en `data.exercises[]`, NO en el log
+   de la sesión). Persistencia automática al cerrar (Apple Notes-style: no
+   hay "cancelar"). El indicador naranja del botón ⓘ se refresca tras guardar.
+   ============================================================================ */
+function openTipsModal(exercise, onSaved) {
+  const initial = exercise.tips || '';
+  openModal(
+    '<div class="modal-head">' +
+      '<div>' +
+        '<h3>Notas técnicas</h3>' +
+        '<div class="tips-sub">' + escapeH(exercise.name) + '</div>' +
+      '</div>' +
+      '<button class="x" id="tipsClose" type="button" aria-label="Guardar y cerrar">×</button>' +
+    '</div>' +
+    '<div class="modal-body">' +
+      '<p class="tips-hint">' +
+        'Información <b>permanente</b> del ejercicio · se mostrará en todas las ' +
+        'sesiones futuras. Ideal para configuraciones de máquina, claves técnicas ' +
+        'o recordatorios de foco.' +
+      '</p>' +
+      '<textarea id="tipsText" class="tips-textarea" rows="7" ' +
+        'placeholder="Ej. Ajustar el banco en la posición 3 · Mantener los codos cerrados · Foco en la fase excéntrica…" ' +
+        'autocapitalize="sentences" autocorrect="on" spellcheck="true">' +
+        escapeH(initial) +
+      '</textarea>' +
+    '</div>' +
+    '<div class="modal-foot">' +
+      '<button class="btn" id="tipsSave" type="button">Listo</button>' +
+    '</div>'
+  );
+
+  const ta = $('#tipsText');
+  // Foco diferido — algunos navegadores no aceptan focus durante un layout
+  // pendiente; 60 ms es suficiente para que el modal pinte completo.
+  setTimeout(() => ta.focus(), 60);
+
+  function saveAndClose() {
+    const next = ta.value.trim();
+    if (next !== (initial || '').trim()) {
+      // Solo persistimos si cambió algo → evita un emit innecesario que
+      // dispararía suscriptores del Store sin razón.
+      Store.updateExercise(exercise.id, { tips: next });
+      toast(next ? 'Notas guardadas' : 'Notas eliminadas');
+    }
+    closeModal();
+    if (onSaved) onSaved();
+  }
+
+  $('#tipsClose').addEventListener('click', saveAndClose);
+  $('#tipsSave').addEventListener('click', saveAndClose);
+  // Cmd/Ctrl + Enter desde el textarea → guardar (atajo de power-user).
+  ta.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      saveAndClose();
+    }
+  });
 }
 
 /* ============================================================================
