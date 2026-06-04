@@ -117,6 +117,63 @@ function persist(state) {
 }
 
 /* ============================================================================
+   Página de CALENTAMIENTO — siempre en pages[0]
+   ----------------------------------------------------------------------------
+   Apple Fitness-style: pantalla dedicada con icono pulsante, título grande,
+   subtítulo de duración, lista de tips, y un botón "Marcar completado" que
+   persiste en localStorage (`warmup-<date>`).
+   El page object devuelve `warmup: true` → isPageDone() lo trata como done
+   (no bloquea "Terminar entrenamiento") y nextNavTarget() lo trata como
+   gate de inicio (botón "Empezar entrenamiento" → primer ejercicio real).
+   ============================================================================ */
+function buildWarmupPage(workoutDate) {
+  const KEY = 'warmup-' + workoutDate;
+  const isOn = () => localStorage.getItem(KEY) === '1';
+
+  const el = h('div', { class: 'aw-page aw-page-warmup' });
+
+  const checkBtn = h('button', {
+    class: 'aw-warmup-check' + (isOn() ? ' on' : ''),
+    type: 'button',
+  }, isOn() ? '✓ Calentamiento completado' : 'Marcar calentamiento completado');
+
+  checkBtn.addEventListener('click', () => {
+    if (isOn()) {
+      localStorage.removeItem(KEY);
+      checkBtn.classList.remove('on');
+      checkBtn.textContent = 'Marcar calentamiento completado';
+    } else {
+      localStorage.setItem(KEY, '1');
+      checkBtn.classList.add('on');
+      checkBtn.textContent = '✓ Calentamiento completado';
+    }
+  });
+
+  el.append(
+    h('div', { class: 'aw-warmup-hero' },
+      h('div', { class: 'aw-warmup-icon', 'aria-hidden': 'true' }, '🔥'),
+      h('h2', { class: 'aw-warmup-title' }, 'Calentamiento'),
+      h('p', { class: 'aw-warmup-sub' }, '5 - 10 min · prepara tu cuerpo'),
+    ),
+    h('ul', { class: 'aw-warmup-tips' },
+      h('li', null, 'Movilidad articular general'),
+      h('li', null, 'Activación dinámica del grupo principal'),
+      h('li', null, 'Sube progresivamente hasta la primera carga'),
+    ),
+    checkBtn,
+  );
+
+  return {
+    el,
+    ex: null,
+    item: null,
+    warmup: true,             // marca distintiva para isPageDone / nextNavTarget
+    refresh() {},
+    state: { rows: [] },
+  };
+}
+
+/* ============================================================================
    Página de un ejercicio
    ============================================================================ */
 function buildPage(item, pageIdx) {
@@ -411,6 +468,7 @@ function refreshProgress() {
    ============================================================================ */
 function isPageDone(page) {
   if (!page) return true;
+  if (page.warmup) return true;             // warmup nunca bloquea "Terminar"
   if (!page.ex) return true;                // ejercicio borrado → no bloquea
   if (!page.state || !page.state.rows.length) return false;
   return page.state.rows.every(r => r.done);
@@ -421,6 +479,14 @@ function nextNavTarget() {
   const n = pages.length;
   if (n === 0) return { mode: 'finish' };
 
+  // Estamos en el warmup → modo "Empezar entrenamiento" (CTA propia).
+  // Salto al primer ejercicio real (con ex válido).
+  if (pages[idx] && pages[idx].warmup) {
+    const firstExIdx = pages.findIndex((p, i) => i > 0 && p.ex);
+    if (firstExIdx === -1) return { mode: 'finish' };
+    return { mode: 'start', targetIdx: firstExIdx };
+  }
+
   const allDone = pages.every(isPageDone);
   if (allDone) return { mode: 'finish' };
 
@@ -430,12 +496,8 @@ function nextNavTarget() {
   }
 
   // Estamos en la ÚLTIMA pero algo está pendiente → vuelta al primer saltado.
-  // Buscamos un pendiente que NO sea el propio current (si el current está
-  // pendiente, lo correcto es quedarse — pero como ya estamos en la última,
-  // ya está visible).
   const skipIdx = pages.findIndex((p, i) => i !== idx && !isPageDone(p));
   if (skipIdx === -1) {
-    // Solo el current está pendiente → ok, "Terminar" por simplicidad.
     return { mode: 'finish' };
   }
   return { mode: 'back', targetIdx: skipIdx, ex: pages[skipIdx].ex };
@@ -443,26 +505,46 @@ function nextNavTarget() {
 
 function updateChrome() {
   const n = pages.length;
-  $('#awCounter').textContent = n ? `Ej. ${idx + 1} / ${n}` : '';
   const cur = pages[idx];
-  if (cur && cur.ex) {
-    const ord = computeOrder(cur.ex.id);
-    $('#awPos').textContent = roman(ord);
-  } else {
+
+  if (cur && cur.warmup) {
+    // Header del warmup: nombre claro, sin pos romana.
+    $('#awCounter').textContent = 'Calentamiento';
     $('#awPos').textContent = '';
+  } else {
+    // En ejercicios reales el contador descuenta el warmup del total.
+    const realCount = pages.filter(p => !p.warmup).length;
+    const realIdx   = pages.slice(0, idx + 1).filter(p => !p.warmup).length;
+    $('#awCounter').textContent = realCount ? `Ej. ${realIdx} / ${realCount}` : '';
+    if (cur && cur.ex) {
+      const ord = computeOrder(cur.ex.id);
+      $('#awPos').textContent = roman(ord);
+    } else {
+      $('#awPos').textContent = '';
+    }
   }
 
-  const foot = $('#awNext');
-  const prevBtn = $('#awPrev');
-  prevBtn.style.visibility = idx > 0 ? 'visible' : 'hidden';
+  const foot      = $('#awNext');
+  const prevBtn   = $('#awPrev');
+  const changeBtn = $('#awChange');
+  prevBtn.style.visibility   = idx > 0 ? 'visible' : 'hidden';
+  // "Cambiar ej." no aplica al warmup (no hay ejercicio que cambiar).
+  if (changeBtn) changeBtn.style.visibility = (cur && cur.warmup) ? 'hidden' : 'visible';
 
   const action = nextNavTarget();
-  foot.classList.remove('finish', 'return');
+  foot.classList.remove('finish', 'return', 'start');
   foot.innerHTML = '';
 
   if (action.mode === 'finish') {
     foot.classList.add('finish');
     foot.append(h('span', { class: 'aw-next-name' }, 'Terminar entrenamiento'));
+  } else if (action.mode === 'start') {
+    // Modo dedicado del warmup → CTA primaria "Empezar entrenamiento".
+    foot.classList.add('start');
+    foot.append(
+      h('span', { class: 'aw-next-name' }, 'Empezar entrenamiento'),
+      h('span', { class: 'aw-next-arrow' }, '›'),
+    );
   } else if (action.mode === 'back') {
     foot.classList.add('return');
     foot.append(
@@ -502,7 +584,11 @@ function rebuildPages(focusExId) {
   const a = Store.activeWorkout();
   const routine = a && a.routineId ? Store.routineById(a.routineId) : null;
   const items = activeItems(routine);
-  pages = items.map((it, i) => buildPage(it, i));
+  // Pages[0] = warmup; pages[1..n] = ejercicios reales.
+  // Si no hay items, no añadimos warmup (no tiene sentido warmupear para nada).
+  pages = items.length
+    ? [buildWarmupPage(date), ...items.map((it, i) => buildPage(it, i))]
+    : [];
 
   const track = $('#awTrack');
   if (track) mount(track, pages.map(p => p.el));
@@ -739,12 +825,22 @@ export function openActiveWorkout() {
   const routine = a.routineId ? Store.routineById(a.routineId) : null;
   const items = activeItems(routine);
 
-  // Construir páginas
-  pages = items.map((it, i) => buildPage(it, i));
+  // Construir páginas: warmup en pages[0], ejercicios en pages[1..n].
+  pages = items.length
+    ? [buildWarmupPage(date), ...items.map((it, i) => buildPage(it, i))]
+    : [];
 
-  // Empezar en el primer ejercicio sin sesión (retomar donde lo dejaste)
-  let start = pages.findIndex(p => p.ex && !hasSession(p.ex.id));
-  idx = start === -1 ? 0 : start;
+  // Decisión de la página inicial:
+  //   - Workout NUEVO (ningún ejercicio iniciado todavía) → pages[0] = warmup.
+  //   - Workout en CURSO (ya hay sesiones registradas) → primer pendiente,
+  //     saltándose el warmup (no tiene sentido volver a calentar a mitad).
+  const hasAnySession = pages.some(p => p.ex && hasSession(p.ex.id));
+  if (!hasAnySession) {
+    idx = pages.length ? 0 : 0;       // arranca en warmup
+  } else {
+    const start = pages.findIndex(p => p.ex && !hasSession(p.ex.id));
+    idx = start === -1 ? 0 : start;
+  }
 
   const track = h('div', { class: 'aw-track', id: 'awTrack' },
     ...(pages.length ? pages.map(p => p.el)
