@@ -171,7 +171,11 @@ function renderChipsByExercise(filterGroup) {
 
   const rows = exs.map(ex => buildHistRow(ex));
   mount(list, rows);
-  list.querySelectorAll('.chips-scroll').forEach(s => { s.scrollLeft = s.scrollWidth; });
+  // NOTA: ya no hacemos scrollLeft = scrollWidth aquí. Antes hacía falta
+  // porque las sesiones se mostraban ASC (más antigua a la izquierda) y
+  // queríamos auto-scrollear al final para mostrar la más reciente. Ahora
+  // `buildHistRow` reversa el array para que el chip de hoy esté en la
+  // posición 0 (extremo izquierdo), que es el default natural del scroller.
 }
 
 function buildHistRow(ex) {
@@ -194,6 +198,13 @@ function buildHistRow(ex) {
 
   const maxW = Math.max(...sessions.map(topWeight));
 
+  // IMPORTANTE: el array `sessions` viene ASC (más antigua → más reciente).
+  // Calculamos el trend de cada chip COMPARANDO con la sesión anterior en
+  // el tiempo (sessions[idx-1] = la inmediatamente previa cronológicamente),
+  // que es la semántica correcta de "subió vs. mi entreno anterior".
+  // Después de construir los chips, los REVERSAMOS para el DOM: el chip de
+  // hoy queda primero (izquierda) — el usuario no tiene que scrollear a la
+  // derecha para ver lo último que hizo.
   const chips = sessions.map((s, idx) => {
     const prevTop = idx > 0 ? topWeight(sessions[idx - 1]) : null;
     const thisTop = topWeight(s);
@@ -208,6 +219,7 @@ function buildHistRow(ex) {
       onTap: () => openEditSession(ex, s),
     });
   });
+  chips.reverse();  // newest first (DOM order: izquierda → derecha)
 
   return h('div', { class: 'hist-row' },
     h('div', { class: 'hr-head' },

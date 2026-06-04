@@ -310,7 +310,12 @@
 
 .chips-scroll{
   overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
-  padding:2px 14px 4px 0; scrollbar-width:thin;
+  /* padding-top: 12px da aire al sticker "PR" del .chip.pr::before (top:-6px).
+     Con el padding original de 2px, los 6px restantes del badge quedaban fuera
+     del padding-box y `overflow-y:hidden` los recortaba — el badge se veía
+     mutilado en la fila. 12px = 6 (compensación) + 6 (respiración). */
+  padding:12px 14px 4px 4px;
+  scrollbar-width:thin;
 }
 .chips-scroll::-webkit-scrollbar{ height:4px; }
 .chips-scroll::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
