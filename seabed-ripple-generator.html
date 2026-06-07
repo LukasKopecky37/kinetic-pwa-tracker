@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Procedural Sandy Seabed — Wave Ripples</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+  :root{
+    --sand: #e9d8a6;
+    --sand-soft: #f4e9c8;
+    --teal-deep: #0a3d44;
+    --teal: #1b7f8c;
+    --turq: #3fb8c4;
+    --turq-bright: #7fe3e0;
+    --ink: #07343a;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden; }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:
+      radial-gradient(120% 90% at 50% 0%, #aef1ec 0%, #4cc6cf 42%, #1b7f8c 78%, #0a3d44 100%);
+    color:#06343a;
+    touch-action:none;
+  }
+  #cnv{ position:fixed; inset:0; z-index:0; }
+
+  /* ---- control panel ---- */
+  #ui{
+    position:fixed; z-index:5; left:12px; right:12px; bottom:12px;
+    max-width:430px; margin:0 auto;
+    background:rgba(8,52,58,0.42);
+    backdrop-filter:blur(16px) saturate(150%);
+    -webkit-backdrop-filter:blur(16px) saturate(150%);
+    border:1px solid rgba(255,255,255,0.22);
+    border-radius:20px;
+    padding:14px 16px 16px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.28);
+    color:#f4f9f8;
+    transition:transform .35s ease, opacity .35s ease;
+  }
+  #ui.collapsed{ transform:translateY(calc(100% - 52px)); }
+  #ui h1{
+    font-size:14px; letter-spacing:.04em; margin:0 0 2px; font-weight:700;
+    display:flex; align-items:center; gap:8px;
+  }
+  #ui h1 .dot{ width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #fff, var(--turq-bright) 40%, var(--teal) 100%);
+    box-shadow:0 0 10px var(--turq-bright); }
+  #ui .sub{ font-size:11px; opacity:.72; margin:0 0 10px; font-weight:400; }
+
+  .row{ margin:9px 0; }
+  .row label{ display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12px; font-weight:600; margin-bottom:5px; }
+  .row label .val{ font-variant-numeric:tabular-nums; font-weight:700;
+    color:var(--turq-bright); font-size:12px; }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:6px;
+    background:linear-gradient(90deg, var(--turq-bright), var(--sand));
+    outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:22px;height:22px;border-radius:50%;
+    background:radial-gradient(circle at 32% 30%, #fff, var(--sand-soft) 45%, var(--sand) 100%);
+    border:2px solid rgba(255,255,255,0.9);
+    box-shadow:0 2px 8px rgba(0,0,0,0.35); cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:22px;height:22px;border-radius:50%; border:2px solid #fff;
+    background:var(--sand-soft); box-shadow:0 2px 8px rgba(0,0,0,0.35); cursor:pointer;
+  }
+  .btns{ display:flex; gap:8px; margin-top:12px; }
+  .btns button{
+    flex:1; border:none; border-radius:12px; padding:10px 8px; font-size:12.5px; font-weight:700;
+    color:#06343a; cursor:pointer;
+    background:linear-gradient(180deg, var(--sand-soft), var(--sand));
+    box-shadow:0 4px 14px rgba(0,0,0,0.25); transition:transform .1s ease;
+  }
+  .btns button.ghost{ background:rgba(255,255,255,0.14); color:#eafbfa;
+    border:1px solid rgba(255,255,255,0.28); }
+  .btns button:active{ transform:translateY(1px) scale(.99); }
+
+  #toggle{
+    position:absolute; top:10px; right:12px;
+    width:30px;height:30px;border-radius:50%;
+    background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.3);
+    color:#eafbfa; font-size:15px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #hint{
+    position:fixed; z-index:4; top:14px; left:0; right:0; text-align:center;
+    font-size:12px; color:rgba(255,255,255,0.85); pointer-events:none;
+    text-shadow:0 1px 6px rgba(0,0,0,0.4); padding:0 16px;
+  }
+</style>
+</head>
+<body>
+  <div id="cnv"></div>
+  <div id="hint">🖐️ Drag to rotate · pinch / scroll to zoom</div>
+
+  <div id="ui">
+    <button id="toggle" title="Show / hide">▾</button>
+    <h1><span class="dot"></span> Sandy Seabed — Wave Ripples</h1>
+    <p class="sub">Procedural ripples of a calm shallow bay</p>
+
+    <div class="row">
+      <label>Wave frequency <span class="val" id="vFreq"></span></label>
+      <input type="range" id="freq" min="0.2" max="3.5" step="0.01" value="1.1">
+    </div>
+    <div class="row">
+      <label>Wave amplitude (ridge height) <span class="val" id="vAmp"></span></label>
+      <input type="range" id="amp" min="0" max="130" step="1" value="55">
+    </div>
+    <div class="row">
+      <label>Noise / randomness <span class="val" id="vRnd"></span></label>
+      <input type="range" id="rnd" min="0" max="1.5" step="0.01" value="0.5">
+    </div>
+    <div class="row">
+      <label>Crest sharpness <span class="val" id="vShp"></span></label>
+      <input type="range" id="shp" min="1" max="8" step="0.1" value="3.2">
+    </div>
+
+    <div class="btns">
+      <button id="regen" class="ghost">🌀 New ripple seed</button>
+      <button id="reset">↺ Reset</button>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   Procedural sandy seabed with wave ripples — p5.js (WEBGL)
+   Math: 2D Perlin noise + anisotropic stretching (waves align
+   along one axis) -> sine wave -> power function for sharp
+   crests & wide flat troughs + noise-warped phase for branching.
+   ============================================================ */
+
+const GRID = 150;          // vertices per side (mesh resolution)
+const SPACING = 5.0;       // world units between vertices
+const SIZE = GRID * SPACING;
+
+const params = {
+  frequency: 1.1,
+  amplitude: 55,
+  randomness: 0.5,
+  sharpness: 3.2,
+  seed: 1234
+};
+
+// cached field data, rebuilt only when a parameter changes
+let H = [];                // heights[r][c]
+let NX=[], NY=[], NZ=[];   // per-vertex normals
+let dirty = true;
+
+// ---- colour palette (turquoise-shadowed sand -> sunlit sand) ----
+let cTrough, cMid, cCrest, cPeak;
+
+function setup(){
+  const c = createCanvas(windowWidth, windowHeight, WEBGL);
+  c.parent('cnv');
+  pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
+  noiseDetail(4, 0.5);
+
+  cTrough = color(26, 92, 96);    // deep turquoise shadow in the troughs
+  cMid    = color(72, 158, 150);  // turquoise-tinted wet sand
+  cCrest  = color(212, 192, 140); // sunlit sandy ridge
+  cPeak   = color(245, 234, 196); // brightest crest highlight
+
+  bindUI();
+  rebuildField();
+}
+
+function windowResized(){ resizeCanvas(windowWidth, windowHeight); }
+
+/* -------- the core height function (per grid vertex) -------- */
+function fieldHeight(c, r){
+  const f = params.frequency;
+  // Anisotropic noise: small step across ripples (x/c), large step
+  // along the crest line (y/r) -> features stretch into long ridges.
+  let warp = noise(c * 0.05 * f, r * 0.012 * f + params.seed);
+  warp = (warp - 0.5) * 2.0;                 // -1..1
+
+  // Ripple wave repeats along the c axis; phase warped = branching/chaos
+  const phase = c * f * 0.16 + warp * params.randomness * 3.0;
+  const wave  = Math.sin(phase * TWO_PI);    // -1..1
+  let t = (wave + 1) * 0.5;                   // 0..1
+
+  // Power function -> wide flat troughs, sharp narrow crests
+  let ridge = Math.pow(t, params.sharpness);
+
+  // Fine grained sand texture, scaled by randomness
+  const detail = (noise(c * 0.16 + 50, r * 0.16 + params.seed) - 0.5)
+                 * 0.22 * params.randomness;
+
+  return (ridge + detail) * params.amplitude;
+}
+
+function rebuildField(){
+  // 1) heights
+  H = new Array(GRID);
+  for (let r = 0; r < GRID; r++){
+    H[r] = new Float32Array(GRID);
+    for (let c = 0; c < GRID; c++){
+      H[r][c] = fieldHeight(c, r);
+    }
+  }
+  // 2) normals via central differences (world space; y is up = -height)
+  NX = []; NY = []; NZ = [];
+  for (let r = 0; r < GRID; r++){
+    NX[r] = new Float32Array(GRID);
+    NY[r] = new Float32Array(GRID);
+    NZ[r] = new Float32Array(GRID);
+    for (let c = 0; c < GRID; c++){
+      const hL = H[r][Math.max(c-1,0)];
+      const hR = H[r][Math.min(c+1,GRID-1)];
+      const hD = H[Math.max(r-1,0)][c];
+      const hU = H[Math.min(r+1,GRID-1)][c];
+      // gradient; height maps to -y so invert
+      const nx = (hL - hR);
+      const nz = (hD - hU);
+      const ny = 2 * SPACING;
+      const inv = 1 / Math.sqrt(nx*nx + ny*ny + nz*nz);
+      NX[r][c] = nx * inv;
+      NY[r][c] = ny * inv;
+      NZ[r][c] = nz * inv;
+    }
+  }
+  dirty = false;
+}
+
+// height -> colour ramp
+function heightColor(h){
+  const t = constrain(h / (params.amplitude + 0.0001), 0, 1.2);
+  if (t < 0.35)      return lerpColor(cTrough, cMid,  t / 0.35);
+  else if (t < 0.75) return lerpColor(cMid,   cCrest,(t - 0.35) / 0.40);
+  else               return lerpColor(cCrest, cPeak, constrain((t - 0.75) / 0.45, 0, 1));
+}
+
+function draw(){
+  if (dirty) rebuildField();
+
+  background(36, 150, 160);
+
+  // gentle default tilt + free mouse orbit
+  orbitControl(2.2, 2.2, 0.1);
+  rotateX(PI/3.0);
+
+  // ---- lighting: sunlight from above + soft ambient turquoise fill ----
+  ambientLight(70, 96, 100);
+  directionalLight(255, 248, 225, -0.35, 0.85, -0.45);   // the "sun"
+  pointLight(120, 220, 220, 0, -400, 200);               // soft water fill
+  specularMaterial(40);
+  shininess(8);
+
+  noStroke();
+
+  const off = -SIZE/2;
+  // render as triangle strips, per-vertex colour + normal
+  for (let r = 0; r < GRID - 1; r++){
+    beginShape(TRIANGLE_STRIP);
+    for (let c = 0; c < GRID; c++){
+      const x = off + c * SPACING;
+      const z = off + r * SPACING;
+
+      // row r
+      let h0 = H[r][c];
+      fill(heightColor(h0));
+      normal(NX[r][c], NY[r][c], NZ[r][c]);
+      vertex(x, -h0, z);
+
+      // row r+1
+      let h1 = H[r+1][c];
+      fill(heightColor(h1));
+      normal(NX[r+1][c], NY[r+1][c], NZ[r+1][c]);
+      vertex(x, -h1, z + SPACING);
+    }
+    endShape();
+  }
+}
+
+/* ----------------------- UI wiring ----------------------- */
+function fmt(n, d){ return Number(n).toFixed(d); }
+
+function bindUI(){
+  const freq = document.getElementById('freq');
+  const amp  = document.getElementById('amp');
+  const rnd  = document.getElementById('rnd');
+  const shp  = document.getElementById('shp');
+
+  const vFreq = document.getElementById('vFreq');
+  const vAmp  = document.getElementById('vAmp');
+  const vRnd  = document.getElementById('vRnd');
+  const vShp  = document.getElementById('vShp');
+
+  function sync(){
+    vFreq.textContent = fmt(params.frequency, 2);
+    vAmp.textContent  = fmt(params.amplitude, 0);
+    vRnd.textContent  = fmt(params.randomness, 2);
+    vShp.textContent  = fmt(params.sharpness, 1);
+  }
+
+  freq.addEventListener('input', e => { params.frequency  = +e.target.value; dirty = true; sync(); });
+  amp .addEventListener('input', e => { params.amplitude  = +e.target.value; dirty = true; sync(); });
+  rnd .addEventListener('input', e => { params.randomness = +e.target.value; dirty = true; sync(); });
+  shp .addEventListener('input', e => { params.sharpness  = +e.target.value; dirty = true; sync(); });
+
+  // stop drags on the panel from rotating the canvas
+  const ui = document.getElementById('ui');
+  ['pointerdown','pointermove','touchstart','touchmove','mousedown','wheel']
+    .forEach(ev => ui.addEventListener(ev, e => e.stopPropagation(), {passive:true}));
+
+  document.getElementById('regen').addEventListener('click', () => {
+    params.seed = Math.floor(Math.random() * 10000);
+    noiseSeed(params.seed);
+    dirty = true;
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    params.frequency = 1.1; params.amplitude = 55;
+    params.randomness = 0.5; params.sharpness = 3.2;
+    freq.value = 1.1; amp.value = 55; rnd.value = 0.5; shp.value = 3.2;
+    dirty = true; sync();
+  });
+
+  document.getElementById('toggle').addEventListener('click', () => {
+    ui.classList.toggle('collapsed');
+    document.getElementById('toggle').textContent =
+      ui.classList.contains('collapsed') ? '▴' : '▾';
+  });
+
+  noiseSeed(params.seed);
+  sync();
+}
+
+// fade the hint after a few seconds
+setTimeout(() => {
+  const h = document.getElementById('hint');
+  if (h){ h.style.transition = 'opacity 1s'; h.style.opacity = '0'; }
+}, 5000);
+</script>
+</body>
+</html>
