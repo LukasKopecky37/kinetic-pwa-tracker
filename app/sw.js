@@ -14,7 +14,7 @@
  * descargar la nueva shell. Al activar, las caches antiguas se borran.
  */
 
-const CACHE_VERSION = 'rutina-v45';
+const CACHE_VERSION = 'rutina-v46';
 
 // Lista del shell (rutas relativas a la raíz del servidor que sirve la app).
 const SHELL = [
@@ -90,6 +90,7 @@ const SHELL = [
   './js/views/workout.js',
   './js/views/active-workout.js',
   './js/views/body.js',
+  './js/charts/body-composition.js',
 ];
 
 const CDN_HOSTS = ['cdn.jsdelivr.net'];

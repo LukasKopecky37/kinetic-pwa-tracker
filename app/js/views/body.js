@@ -15,6 +15,64 @@ import { escapeH } from '../utils/format.js';
 import { Store } from '../store/store.js';
 import { openModal, closeModal } from '../services/modal.js';
 import { toast } from '../services/toast.js';
+import { renderBodyCompositionChart } from '../charts/body-composition.js';
+import { muscleSVG } from '../components/muscle-map.js';
+
+/* === Fase J·2 · estado de visualización (chart + heatmap) ===
+   `bodyChart` se preserva entre renders para llamarle .destroy() en cada
+   re-render (evita memory leaks de canvas; patrón ya usado en progress.js).
+   `timeframe` persiste como módulo: la elección del usuario sobrevive a
+   re-renders dentro de la sesión pero NO entre tabs (intencional, así
+   cada apertura empieza en "Todo" para ver el panorama completo).
+   `tooltipOpenedAt` evita que el click delegado del outside-close se
+   dispare en el mismo tick que abrió el tooltip. */
+let bodyChart        = null;
+let timeframe        = 'all';
+let tooltipOpenedAt  = 0;
+let outsideBound     = false;
+
+/* === Mapeo Antropometría → región del SVG muscular ===
+   Reutilizamos el SVG existente de muscle-map.js (componente compartido
+   con el heatmap del Análisis). Algunas medidas comparten región — biceps
+   izq+der pintan el grupo "biceps" entero — y la tooltip diferencia los
+   lados al hacer click. `positiveDir` codifica qué dirección del cambio
+   se considera "buena":
+     'grow'   → más cm = progreso (músculo creciendo)
+     'shrink' → menos cm = progreso (reducción de zona de grasa) */
+const FIELD_TO_REGION = {
+  chest:  { region: 'chest',  label: 'Pecho',            positiveDir: 'grow'   },
+  bicepL: { region: 'biceps', label: 'Bíceps izq.',      positiveDir: 'grow'   },
+  bicepR: { region: 'biceps', label: 'Bíceps der.',      positiveDir: 'grow'   },
+  waist:  { region: 'abs',    label: 'Cintura',          positiveDir: 'shrink' },
+  navel:  { region: 'abs',    label: 'Ombligo',          positiveDir: 'shrink' },
+  thighL: { region: 'quads',  label: 'Muslo izq.',       positiveDir: 'grow'   },
+  thighR: { region: 'quads',  label: 'Muslo der.',       positiveDir: 'grow'   },
+  calfL:  { region: 'calves', label: 'Pantorrilla izq.', positiveDir: 'grow'   },
+  calfR:  { region: 'calves', label: 'Pantorrilla der.', positiveDir: 'grow'   },
+};
+
+const REGION_TITLE = {
+  chest:        'Pecho',
+  biceps:       'Bíceps',
+  shoulder:     'Hombros',
+  abs:          'Tronco · cintura',
+  quads:        'Muslos',
+  calves:       'Pantorrillas',
+  triceps:      'Tríceps',
+  lats:         'Dorsales',
+  glutes:       'Glúteos',
+  hamstrings:   'Isquios',
+  'upper-back': 'Espalda alta',
+  'lower-back': 'Espalda baja',
+  'rear-delt':  'Deltoides post.',
+};
+
+const TIMEFRAMES = [
+  { id: '1M',  label: '1M',   days: 30  },
+  { id: '3M',  label: '3M',   days: 90  },
+  { id: '6M',  label: '6M',   days: 180 },
+  { id: 'all', label: 'Todo', days: null },
+];
 
 /* ============================================================================
    Esquema de campos · categorías + campos numéricos con unidad
@@ -81,8 +139,25 @@ export function renderBody() {
   const host = $('#bodyMain');
   if (!host) return;
 
-  const measurements = Store.bodyMeasurements();
+  // Cleanup chart anterior antes de tirar el DOM (evita leak del canvas).
+  if (bodyChart) { bodyChart.destroy(); bodyChart = null; }
+
+  const measurements = Store.bodyMeasurements();  // newest-first
   const last = measurements[0] || null;
+
+  // Filtrado por timeframe para el chart y el heatmap (no afecta a la lista).
+  const ascending = measurements.slice().reverse();  // oldest-first para el chart
+  const filtered  = filterByTimeframe(ascending, timeframe);
+  const deltas    = computeRegionDeltas(filtered);   // null si <2 puntos
+
+  // Canvas + heatmap host + tooltip se preparan ANTES del mount para tener
+  // referencias estables; la inicialización del Chart.js y la pintura del
+  // SVG se hacen DESPUÉS del mount (necesitan los elementos en el DOM).
+  const chartCanvas = h('canvas', { class: 'body-chart-canvas' });
+  const heatmapHost = h('div', { class: 'body-heatmap-svg' });
+  const tooltipEl   = h('div', { class: 'body-tooltip', role: 'tooltip' });
+  const anchorEl    = h('div', { class: 'body-heatmap-anchor' },
+    heatmapHost, tooltipEl);
 
   mount(host, h('div', { class: 'body-view' },
     h('div', { class: 'body-head' },
@@ -106,10 +181,254 @@ export function renderBody() {
       h('span', { class: 'body-cta-chev' }, '›'),
     ),
 
+    // === Selector de rango temporal (afecta chart + heatmap) ===
+    buildTimeframeSelector(),
+
+    // === Gráfico dual-axis Peso + %Grasa ===
+    measurements.length >= 1
+      ? buildChartCard(chartCanvas, filtered)
+      : null,
+
+    // === Mapa de calor anatómico con deltas ===
+    measurements.length >= 1
+      ? buildHeatmapCard(anchorEl, deltas, filtered)
+      : null,
+
+    // === Lista histórica completa (no filtrada) ===
     measurements.length
       ? buildHistoryList(measurements)
       : buildEmptyState(),
   ));
+
+  // Inicializar visualizaciones AHORA que los elementos están en el DOM.
+  if (filtered.length) {
+    bodyChart = renderBodyCompositionChart(chartCanvas, filtered);
+    heatmapHost.innerHTML = muscleSVG([]);   // silueta vacía como base
+    const svgRoot = heatmapHost.querySelector('svg');
+    paintHeatmap(svgRoot, deltas);
+    bindRegionClicks(svgRoot, deltas, tooltipEl, anchorEl);
+  }
+
+  // Outside-click cierra la tooltip. Solo bind una vez por sesión.
+  if (!outsideBound) {
+    document.addEventListener('click', (e) => {
+      if (Date.now() - tooltipOpenedAt < 80) return;  // del mismo gesto
+      const t = $('#bodyMain .body-tooltip');
+      if (!t || !t.classList.contains('on')) return;
+      if (e.target.closest('[data-region]')) return;
+      if (e.target.closest('.body-tooltip')) return;
+      t.classList.remove('on');
+    });
+    outsideBound = true;
+  }
+}
+
+/* ============================================================================
+   Timeframe selector · segmented control [1M | 3M | 6M | Todo]
+   ============================================================================ */
+
+function buildTimeframeSelector() {
+  return h('div', { class: 'body-timeframe', role: 'tablist' },
+    ...TIMEFRAMES.map(tf => h('button', {
+      class: 'btf-chip' + (timeframe === tf.id ? ' on' : ''),
+      type: 'button',
+      role: 'tab',
+      'aria-selected': timeframe === tf.id ? 'true' : 'false',
+      onClick: () => {
+        if (timeframe === tf.id) return;
+        timeframe = tf.id;
+        renderBody();      // re-render para refrescar chart + heatmap
+      },
+    }, tf.label)),
+  );
+}
+
+/* ============================================================================
+   Tarjetas de chart y heatmap (envuelven canvas/SVG con eyebrow + sub)
+   ============================================================================ */
+
+function buildChartCard(canvasEl, filtered) {
+  const hasData = filtered.some(m =>
+    (m.weight != null && m.weight !== '') ||
+    (m.bodyFat != null && m.bodyFat !== ''));
+
+  return h('div', { class: 'body-card-block body-chart-block' },
+    h('div', { class: 'body-block-head' },
+      h('span', { class: 'bbh-eyebrow' }, 'COMPOSICIÓN CORPORAL'),
+      h('span', { class: 'bbh-sub' }, 'Peso · % Grasa'),
+    ),
+    hasData
+      ? h('div', { class: 'body-chart-wrap' }, canvasEl)
+      : h('div', { class: 'body-block-empty' },
+          'Registra peso y/o % de grasa en al menos dos mediciones para ver la curva.'),
+  );
+}
+
+function buildHeatmapCard(anchorEl, deltas, filtered) {
+  const points = filtered.length;
+  const hasDelta = !!deltas && Object.keys(deltas).length > 0;
+
+  return h('div', { class: 'body-card-block body-heatmap-block' },
+    h('div', { class: 'body-block-head' },
+      h('span', { class: 'bbh-eyebrow' }, 'MAPA ANATÓMICO'),
+      h('span', { class: 'bbh-sub' },
+        points < 2
+          ? 'Necesitas ≥2 mediciones'
+          : 'Toca una zona para ver el cambio'),
+    ),
+    hasDelta ? anchorEl : h('div', { class: 'body-block-empty' },
+      points < 2
+        ? 'Cuando registres tu siguiente medición verás aquí las zonas que cambiaron en cm.'
+        : 'No hay perímetros suficientes para calcular cambios en el rango seleccionado.'),
+    hasDelta ? buildHeatmapLegend() : null,
+  );
+}
+
+function buildHeatmapLegend() {
+  return h('div', { class: 'body-heatmap-legend' },
+    h('span', { class: 'bhl-item' },
+      h('i', { class: 'bhl-dot good' }), 'Progreso'),
+    h('span', { class: 'bhl-item' },
+      h('i', { class: 'bhl-dot bad' }), 'Regresión'),
+    h('span', { class: 'bhl-item' },
+      h('i', { class: 'bhl-dot neutral' }), 'Sin cambio'),
+  );
+}
+
+/* ============================================================================
+   Filtrado por timeframe + cómputo de deltas por región
+   ============================================================================ */
+
+function filterByTimeframe(measurements, tf) {
+  const cfg = TIMEFRAMES.find(t => t.id === tf);
+  if (!cfg || cfg.days == null) return measurements.slice();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cut = new Date(today);
+  cut.setDate(cut.getDate() - cfg.days);
+  const cutISO = cut.toISOString().slice(0, 10);
+  return measurements.filter(m => m.date >= cutISO);
+}
+
+/** Compara la PRIMERA y la ÚLTIMA medición del rango y agrega por región.
+ *  Devuelve null si <2 puntos (no se puede computar delta). */
+function computeRegionDeltas(measurements) {
+  if (!measurements || measurements.length < 2) return null;
+  const start = measurements[0];
+  const end   = measurements[measurements.length - 1];
+
+  const byRegion = {};
+  for (const [key, meta] of Object.entries(FIELD_TO_REGION)) {
+    const v0 = start[key], v1 = end[key];
+    if (v0 == null || v1 == null) continue;
+    const change = +(v1 - v0).toFixed(2);
+    const isGood = meta.positiveDir === 'grow' ? change > 0 : change < 0;
+    if (!byRegion[meta.region]) {
+      byRegion[meta.region] = { fields: [], goodSum: 0, count: 0 };
+    }
+    byRegion[meta.region].fields.push({
+      key, label: meta.label,
+      current: v1, previous: v0, change, isGood,
+      positiveDir: meta.positiveDir,
+    });
+    // Score "good direction": grow → +change cuenta como positivo,
+    // shrink → -change cuenta como positivo. Mean luego decide el color.
+    byRegion[meta.region].goodSum += meta.positiveDir === 'grow'
+      ? change : -change;
+    byRegion[meta.region].count += 1;
+  }
+  for (const r of Object.values(byRegion)) {
+    r.goodMean = +(r.goodSum / r.count).toFixed(2);
+  }
+  return byRegion;
+}
+
+/** Pinta cada [data-region] del SVG según el delta. Las regiones sin datos
+ *  quedan en gris translúcido (silueta visible pero sin claim de cambio). */
+function paintHeatmap(svgRoot, byRegion) {
+  if (!svgRoot) return;
+  svgRoot.querySelectorAll('[data-region]').forEach(el => {
+    const region = el.dataset.region;
+    const data = byRegion ? byRegion[region] : null;
+    el.style.cursor = data ? 'pointer' : 'default';
+    if (!data) {
+      el.style.fill    = 'rgba(255,255,255,.08)';
+      el.style.opacity = '0.30';
+      return;
+    }
+    const mean = data.goodMean;   // >0 = progreso; <0 = regresión
+    if (mean > 0.4) {
+      const t = Math.min(1, mean / 3);
+      el.style.fill    = '#34d399';                       // emerald (progreso)
+      el.style.opacity = (0.45 + 0.45 * t).toFixed(3);
+    } else if (mean < -0.4) {
+      const t = Math.min(1, Math.abs(mean) / 3);
+      el.style.fill    = '#f87171';                       // soft red (regresión)
+      el.style.opacity = (0.40 + 0.40 * t).toFixed(3);
+    } else {
+      el.style.fill    = 'rgba(255,255,255,.10)';         // neutral
+      el.style.opacity = '0.50';
+    }
+  });
+}
+
+/* ============================================================================
+   Tooltip flotante al tap sobre una región
+   ============================================================================ */
+
+function bindRegionClicks(svgRoot, byRegion, tooltipEl, anchor) {
+  if (!svgRoot) return;
+  svgRoot.querySelectorAll('[data-region]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      tooltipOpenedAt = Date.now();
+      showRegionTooltip(tooltipEl, el, byRegion, anchor);
+    });
+  });
+}
+
+function showRegionTooltip(tooltipEl, regionEl, byRegion, anchor) {
+  const region = regionEl.dataset.region;
+  const data = byRegion ? byRegion[region] : null;
+
+  let html = '<div class="bt-head">' + escapeH(REGION_TITLE[region] || region) + '</div>';
+
+  if (!data || !data.fields.length) {
+    html += '<div class="bt-empty">Sin medición para esta zona en el rango seleccionado.</div>';
+  } else {
+    for (const f of data.fields) {
+      const arrow = f.change > 0 ? '▲' : f.change < 0 ? '▼' : '·';
+      const sign  = f.change > 0 ? '+' : '';
+      const cls   = Math.abs(f.change) < 0.05 ? 'flat' : (f.isGood ? 'good' : 'bad');
+      html += '<div class="bt-line">' +
+        '<span class="bt-name">' + escapeH(f.label) + '</span>' +
+        '<span class="bt-val">' + f.current.toFixed(1) + ' cm</span>' +
+        '<span class="bt-delta ' + cls + '">' + arrow + ' ' +
+          sign + f.change.toFixed(1) + '</span>' +
+      '</div>';
+    }
+  }
+
+  tooltipEl.innerHTML = html;
+
+  // Posiciona arriba-centrado respecto al elemento clickeado. Si quedaría
+  // recortado por arriba, lo flipea debajo (cubre el caso de zonas altas
+  // como hombros / pecho que en iPhones pequeños no tienen sitio arriba).
+  const rect       = regionEl.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const x = rect.left + rect.width / 2 - anchorRect.left;
+  const yAbove = rect.top - anchorRect.top - 10;
+  const yBelow = rect.bottom - anchorRect.top + 10;
+
+  tooltipEl.style.left = x.toFixed(1) + 'px';
+  if (yAbove < 60) {
+    tooltipEl.classList.add('below');
+    tooltipEl.style.top = yBelow.toFixed(1) + 'px';
+  } else {
+    tooltipEl.classList.remove('below');
+    tooltipEl.style.top = yAbove.toFixed(1) + 'px';
+  }
+  tooltipEl.classList.add('on');
 }
 
 /* ============================================================================

@@ -1424,3 +1424,240 @@
 }
 .bf-foot .btn { flex: 0 0 auto; }
 .bf-foot .btn.danger { margin-right: auto; }
+
+/* ============================================================================
+   CUERPO · Fase J·2 · timeframe + chart + heatmap interactivo
+   ============================================================================ */
+
+/* Segmented control [1M | 3M | 6M | Todo] */
+.body-timeframe {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 2px;
+}
+.btf-chip {
+  background: transparent;
+  border: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 6px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.4px;
+  transition: background .15s, color .15s;
+}
+.btf-chip:hover { color: var(--text); }
+.btf-chip.on {
+  background: var(--surface-3, #1f1f24);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+
+/* Tarjetas de bloque (chart, heatmap) — wrapper común */
+.body-card-block {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+}
+.body-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+.bbh-eyebrow {
+  font-size: 10px; font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase; letter-spacing: 1.8px;
+}
+.bbh-sub {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+}
+.body-block-empty {
+  padding: 18px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.1px;
+  line-height: 1.55;
+}
+
+/* Chart card */
+.body-chart-wrap {
+  position: relative;
+  height: 230px;
+}
+.body-chart-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* === Heatmap anatómico + tooltip === */
+.body-heatmap-anchor {
+  position: relative;
+}
+.body-heatmap-svg {
+  margin: 4px auto 6px;
+  max-width: 380px;
+}
+.body-heatmap-svg svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+/* Silueta base muted para que las zonas pintadas resalten */
+.body-heatmap-svg .silhouette {
+  fill: rgba(255,255,255,.03);
+  stroke: rgba(255,255,255,.10);
+  stroke-width: 0.6;
+}
+/* Hover/tap accent ring para feedback */
+.body-heatmap-svg [data-region]:hover {
+  filter: drop-shadow(0 0 4px rgba(255,107,0,.45));
+}
+
+/* Leyenda del heatmap */
+.body-heatmap-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.04);
+}
+.bhl-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+  letter-spacing: 0.2px;
+}
+.bhl-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.bhl-dot.good    { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,.4); }
+.bhl-dot.bad     { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,.4); }
+.bhl-dot.neutral { background: rgba(255,255,255,.20); }
+
+/* === Tooltip flotante de zona === */
+.body-tooltip {
+  position: absolute;
+  z-index: 30;
+  min-width: 180px;
+  max-width: 260px;
+  background: rgba(15,17,21,.96);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow:
+    0 12px 30px rgba(0,0,0,.55),
+    0 0 0 1px rgba(0,0,0,.2);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -100%) scale(.92);
+  transform-origin: bottom center;
+  transition: opacity .18s, transform .22s cubic-bezier(.2, 1.4, .4, 1);
+  font-size: 12px;
+}
+.body-tooltip.on {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -100%) scale(1);
+}
+.body-tooltip.below {
+  transform-origin: top center;
+  transform: translate(-50%, 0%) scale(.92);
+}
+.body-tooltip.below.on {
+  transform: translate(-50%, 0%) scale(1);
+}
+/* Flecha apuntando a la región */
+.body-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px; height: 9px;
+  background: rgba(15,17,21,.96);
+  border-right: 1px solid rgba(255,255,255,.12);
+  border-bottom: 1px solid rgba(255,255,255,.12);
+  transform: translateX(-50%) rotate(45deg);
+}
+.body-tooltip.below::after {
+  bottom: auto;
+  top: -5px;
+  border-right: 0; border-bottom: 0;
+  border-left: 1px solid rgba(255,255,255,.12);
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+
+.bt-head {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1.6px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.bt-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+.bt-name {
+  flex: 1; min-width: 0;
+  color: var(--text-2);
+  font-size: 11.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bt-val {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 12px;
+}
+.bt-delta {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.bt-delta.good {
+  color: #34d399;
+  background: rgba(52,211,153,.12);
+}
+.bt-delta.bad {
+  color: #f87171;
+  background: rgba(248,113,113,.10);
+}
+.bt-delta.flat {
+  color: var(--muted);
+  background: rgba(255,255,255,.06);
+}
+.bt-empty {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+@media (max-width: 380px) {
+  .body-heatmap-svg { max-width: 320px; }
+  .body-tooltip { min-width: 160px; max-width: 220px; }
+}
