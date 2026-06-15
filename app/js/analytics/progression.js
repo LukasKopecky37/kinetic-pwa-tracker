@@ -63,16 +63,26 @@ export function metTargetStrict(session, repRange, targetSets) {
 }
 
 /**
- * Incremento sugerido por ejercicio. Compuestos / piernas / espalda /
- * glúteos → +5 kg. Aislamientos / brazos / hombros → +2.5 kg.
- * @param {{group?:string, compound?:boolean}|null} exercise
+ * Incremento estricto: +2.5 kg SIEMPRE.
+ *
+ * Antes devolvía +5 kg para compuestos / Piernas / Glúteos / Espalda y
+ * +2.5 kg para aislamientos. QA reveló que los saltos de 5 kg eran
+ * irreales en el gym — un atleta serio en double-progression usa el
+ * escalón mínimo de la barra olímpica (un disco de 1.25 kg por lado =
+ * +2.5 kg netos). Saltar 5 kg cumple objetivos UN día y descarrila las
+ * 2-3 sesiones siguientes.
+ *
+ * El parámetro `_exercise` se conserva por compat de API — todas las
+ * llamadas existentes (suggestNextWeight, override ▲/▼) siguen
+ * pasándolo, ahora simplemente se ignora. Si el usuario quiere
+ * incrementos por ejercicio individualmente, el override ▲ ya cubre
+ * 'súbeme 2.5 esta vez'.
+ *
+ * @param {{group?:string, compound?:boolean}|null} [_exercise]
  * @returns {number}
  */
-export function bumpKgFor(exercise) {
-  if (!exercise) return 2.5;
-  const heavy = exercise.compound
-    || ['Piernas', 'Glúteos', 'Espalda'].includes(exercise.group);
-  return heavy ? 5 : 2.5;
+export function bumpKgFor(_exercise) {
+  return 2.5;
 }
 
 /**
@@ -100,15 +110,21 @@ export function suggestNextWeight(sessions, repRange, targetSets, exercise) {
   const bump  = bumpKgFor(exercise);
 
   /* === Override manual del usuario (Human-in-the-loop) ===
-     Si en la última sesión se marcó nextOverride='up' o 'down', ese flag
-     puentea la lógica automática de double-progression. Es la palanca
-     consciente: "yo decido qué peso quiero la próxima vez, independiente
-     de si cumplí o no el rango de reps". */
+     Si en la última sesión se marcó nextOverride='up' / 'down' / 'flat',
+     ese flag puentea la lógica automática de double-progression. Es la
+     palanca consciente: "yo decido qué peso quiero la próxima vez".
+
+     'flat' (=) → CONGELA el peso. Aunque cumplas el rango estricto y el
+     algoritmo quisiera subir +2.5, te quedas exactamente en workW. Útil
+     cuando quieres consolidar una carga antes del próximo escalón. */
   if (last.nextOverride === 'up') {
     return Math.round((workW + bump) * 2) / 2;
   }
   if (last.nextOverride === 'down') {
     return Math.max(0, Math.round((workW - bump) * 2) / 2);
+  }
+  if (last.nextOverride === 'flat') {
+    return workW;
   }
 
   // Lógica automática estándar: solo sube si cumplió rango estricto.

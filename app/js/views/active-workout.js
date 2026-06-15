@@ -690,17 +690,31 @@ function buildPage(item, pageIdx) {
       h('button', {
         class: 'awo-arrow awo-up' + (v === 'up' ? ' on' : ''),
         type: 'button',
-        title: 'Forzar +peso en la próxima sesión',
+        title: 'Forzar +2.5 kg en la próxima sesión',
         'aria-label': v === 'up'
           ? 'Quitar forzado de subida'
           : 'Forzar subida de peso en la próxima sesión',
         'aria-pressed': v === 'up' ? 'true' : 'false',
         onClick: () => setOverride(v === 'up' ? null : 'up'),
       }, '▲'),
+      // = · FREEZE/LOCK · congela el peso para la próxima sesión.
+      // Puentea al algoritmo: aunque cumplas el rango estricto y la
+      // app quisiera subir +2.5 automáticamente, te quedas en el mismo
+      // peso (útil para consolidar antes del próximo escalón).
+      h('button', {
+        class: 'awo-arrow awo-flat' + (v === 'flat' ? ' on' : ''),
+        type: 'button',
+        title: 'Mantener el mismo peso en la próxima sesión',
+        'aria-label': v === 'flat'
+          ? 'Quitar bloqueo de carga'
+          : 'Bloquear el peso actual para la próxima sesión',
+        'aria-pressed': v === 'flat' ? 'true' : 'false',
+        onClick: () => setOverride(v === 'flat' ? null : 'flat'),
+      }, '='),
       h('button', {
         class: 'awo-arrow awo-down' + (v === 'down' ? ' on' : ''),
         type: 'button',
-        title: 'Forzar -peso en la próxima sesión (descarga)',
+        title: 'Forzar -2.5 kg en la próxima sesión (descarga)',
         'aria-label': v === 'down'
           ? 'Quitar forzado de bajada'
           : 'Forzar bajada de peso en la próxima sesión',
