@@ -283,6 +283,15 @@ body.aw-open .rest-panel { display: none !important; }
   display: flex; align-items: center; justify-content: center;
   font-size: 17px; font-weight: 700; color: var(--text);
   font-variant-numeric: tabular-nums; user-select: none;
+  transition: color .15s, opacity .15s;
+}
+/* Ghost de "última" — cuando la celda está vacía pero hay histórico para
+   esta fila, mostramos el valor de la semana pasada en tono muted como
+   referencia. Mismo lenguaje visual que un placeholder de <input>. */
+.aw-stepper .aw-step-val.placeholder {
+  color: var(--muted);
+  font-weight: 600;
+  opacity: 0.6;
 }
 .aw-set.is-completed .aw-stepper { opacity: .65; }
 .aw-set.is-completed .aw-stepper .aw-step-val { color: var(--good); }

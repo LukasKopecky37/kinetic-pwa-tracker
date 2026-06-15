@@ -214,6 +214,22 @@ function buildPage(item, pageIdx) {
   const baseW      = suggestedW || (lastTop ? lastTop.weight : '');
   const targetReps = parseTargetReps(item.repRange)
     || (lastTop ? lastTop.reps : '');
+
+  /* === "Última" dinámica por fila ===
+     Antes el placeholder de peso/reps era el mismo para TODAS las filas
+     (mostraba el top set durante todo el ejercicio). El usuario perdía
+     la referencia de qué hizo en la serie 2 o 3 la semana pasada.
+     Ahora cada fila lee SU mismo índice en el array de sets del último
+     entrenamiento, con fallback a la última serie registrada si hoy
+     añade más series (ej. hoy 4 cuando la semana pasada hizo 3). */
+  const lastWorkSets = (last && last.sets)
+    ? last.sets.filter(s => !s.warmup && s.reps != null)
+    : [];
+
+  function lastSetForRow(i) {
+    if (!lastWorkSets.length) return null;
+    return lastWorkSets[i] || lastWorkSets[lastWorkSets.length - 1];
+  }
   const restSec    = item.rest || Store.getDefaultRest();
   const todayDone  = Store.sessionsByDate(date).find(s => s.exerciseId === ex.id);
   const plannedN   = item.sets || 3;
@@ -344,13 +360,24 @@ function buildPage(item, pageIdx) {
   }
 
   function field(cls, key, row, i, mode) {
+    // "Última" per fila: lee el set del MISMO índice en el último workout.
+    // Si hoy hay más series que la semana pasada, repite la última serie
+    // registrada como referencia (fallback en lastSetForRow).
+    const rowLast = lastSetForRow(i);
+    const phWeight = rowLast?.weight != null
+      ? String(rowLast.weight)
+      : (baseW || '');
+    const phReps = rowLast?.reps != null
+      ? String(rowLast.reps)
+      : (targetReps || '');
     const inp = h('input', {
       class: 'aw-in ' + cls,
       type: 'number', inputmode: mode,
       step: key === 'reps' ? '1' : '0.5',
       value: row[key] === '' || row[key] == null ? '' : row[key],
-      placeholder: key === 'weight'
-        ? (baseW || '') : key === 'reps' ? (targetReps || '') : '',
+      placeholder: key === 'weight' ? phWeight
+                 : key === 'reps'   ? phReps
+                 : '',
       disabled: row.done || undefined,    // bloqueado al completar la serie
     });
     inp.addEventListener('input', () => {
@@ -372,11 +399,29 @@ function buildPage(item, pageIdx) {
    *
    * Parámetro `key` permite reutilizar el stepper para reps unificado
    * ('reps') o para los dos lados en modo split ('repsL', 'repsR').
-   * Parámetro `extra` añade clase CSS (ej. 'aw-stepper-mini' para split). */
-  function repsStepper(row, key = 'reps', extra = '') {
-    const display = () =>
-      row[key] === '' || row[key] == null ? '—' : String(row[key]);
-    const val = h('div', { class: 'aw-step-val' }, display());
+   * Parámetro `extra` añade clase CSS (ej. 'aw-stepper-mini' para split).
+   * Parámetro `rowIdx` activa el modo "última per fila" — placeholder ghost
+   * + smart-default con el valor del MISMO índice del último entrenamiento. */
+  function repsStepper(row, key = 'reps', extra = '', rowIdx = null) {
+    // Última per fila: si tenemos índice y hay histórico, leemos el set
+    // del mismo índice (con fallback a la última serie registrada).
+    const rowLast = (rowIdx != null) ? lastSetForRow(rowIdx) : null;
+    const lastRefForKey =
+      rowLast == null ? null :
+      key === 'reps'  ? rowLast.reps :
+      key === 'repsL' ? (rowLast.repsL != null ? rowLast.repsL : null) :
+      key === 'repsR' ? (rowLast.repsR != null ? rowLast.repsR : null) :
+      null;
+
+    const isEmpty = () => row[key] === '' || row[key] == null;
+    const display = () => {
+      if (!isEmpty()) return String(row[key]);
+      if (lastRefForKey != null) return String(lastRefForKey);   // ghost de "última"
+      return '—';
+    };
+    const val = h('div', {
+      class: 'aw-step-val' + (isEmpty() ? ' placeholder' : ''),
+    }, display());
     const wrap = h('div', { class: 'aw-stepper' + (extra ? ' ' + extra : '') });
 
     const refreshUnder = () => {
@@ -389,12 +434,22 @@ function buildPage(item, pageIdx) {
       if (setRow) setRow.classList.toggle('is-under', under);
     };
 
+    const refreshDisplay = () => {
+      val.textContent = display();
+      val.classList.toggle('placeholder', isEmpty());
+    };
+
     const bump = (delta) => {
       if (row.done) return;
       const cur = parseInt(row[key], 10);
-      if (!Number.isFinite(cur)) row[key] = targetReps || 1;
-      else                       row[key] = Math.max(0, cur + delta);
-      val.textContent = display();
+      if (!Number.isFinite(cur)) {
+        // Smart default: salta al valor de la última semana en ESTA serie.
+        // Si no hay histórico, cae al targetReps del rango del item.
+        row[key] = (lastRefForKey != null ? lastRefForKey : (targetReps || 1));
+      } else {
+        row[key] = Math.max(0, cur + delta);
+      }
+      refreshDisplay();
       refreshUnder();
     };
 
@@ -427,13 +482,14 @@ function buildPage(item, pageIdx) {
     ];
     const midEls = state.split
       ? [
-          // Split mode: dos mini-steppers L | R, RPE oculto
-          repsStepper(row, 'repsL', 'aw-stepper-mini'),
-          repsStepper(row, 'repsR', 'aw-stepper-mini'),
+          // Split mode: dos mini-steppers L | R, RPE oculto.
+          // Cada uno lee su índice del histórico → ghost de "última" per fila.
+          repsStepper(row, 'repsL', 'aw-stepper-mini', i),
+          repsStepper(row, 'repsR', 'aw-stepper-mini', i),
         ]
       : [
           // Normal: un stepper de reps + input de RPE
-          repsStepper(row, 'reps'),
+          repsStepper(row, 'reps', '', i),
           field('aw-rpe', 'rpe', row, i, 'decimal'),
         ];
     const tailEls = [
@@ -474,8 +530,12 @@ function buildPage(item, pageIdx) {
       const cur = numify(row.weight);
       let next;
       if (!Number.isFinite(cur) || cur <= 0) {
-        // Primer toque sobre input vacío → carga el peso sugerido.
-        const sugg = numify(baseW);
+        // Primer toque sobre input vacío → carga la "última" per fila si
+        // existe (peso de la serie i del último entrenamiento), si no el
+        // peso sugerido por el algoritmo, si no el delta puro.
+        const rowLast = lastSetForRow(i);
+        const lastW = rowLast?.weight;
+        const sugg = (lastW != null) ? lastW : numify(baseW);
         next = Number.isFinite(sugg) && sugg > 0 ? sugg : Math.max(0, delta);
       } else {
         // Redondeo a 0.5 para que un 57.5 + 2.5 quede en 60 limpio.
