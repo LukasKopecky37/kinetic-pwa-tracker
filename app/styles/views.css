@@ -1100,3 +1100,327 @@
   padding:16px 12px; border:1px dashed var(--line); border-radius:var(--radius-sm);
 }
 
+
+/* ============================================================================
+   CUERPO · Antropometría · Body Progress (Fase J·1)
+   ----------------------------------------------------------------------------
+   Diseño Apple Health-style: tipografía sofisticada, espacios generosos,
+   secciones agrupadas con icono + título, inputs minimalistas tabulares.
+   ============================================================================ */
+.body-view {
+  display: flex; flex-direction: column;
+  gap: 18px;
+  padding: 4px 0 24px;
+}
+
+.body-head { padding: 0 4px; }
+.body-h2 {
+  font-size: clamp(24px, 6vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: var(--text);
+  margin: 0 0 6px;
+  line-height: 1.1;
+}
+.body-sub {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 540px;
+  letter-spacing: 0.1px;
+}
+
+/* CTA "Registrar nueva medición" — botón hero full-width */
+.body-cta {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%;
+  background: linear-gradient(135deg,
+    rgba(255,107,0,.18) 0%,
+    rgba(255,164,92,.10) 100%);
+  border: 1px solid rgba(255,107,0,.40);
+  border-radius: 18px;
+  padding: 16px 18px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: transform .12s, border-color .15s, box-shadow .18s;
+  box-shadow: 0 6px 18px rgba(255,107,0,.12);
+}
+.body-cta:hover {
+  border-color: var(--accent);
+  box-shadow: 0 10px 26px rgba(255,107,0,.22);
+}
+.body-cta:active { transform: scale(.985); }
+.body-cta-plus {
+  width: 38px; height: 38px;
+  background: var(--accent);
+  color: #1a0a00;
+  border-radius: 50%;
+  font-size: 22px; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(255,107,0,.35);
+}
+.body-cta-text {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.body-cta-text b {
+  font-size: 15px; font-weight: 800;
+  letter-spacing: -0.1px;
+  color: var(--text);
+}
+.body-cta-text small {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+}
+.body-cta-chev {
+  font-size: 22px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Histórico */
+.body-history { display: flex; flex-direction: column; gap: 8px; }
+.body-history-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0 4px;
+}
+.bh-eyebrow {
+  font-size: 11px; font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase; letter-spacing: 1.8px;
+}
+.bh-count {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+}
+.body-history-list { display: flex; flex-direction: column; gap: 8px; }
+
+.body-card {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.body-card:hover {
+  border-color: rgba(255,107,0,.25);
+  background: rgba(255,255,255,.02);
+}
+.bc-date {
+  font-size: 13px; font-weight: 700;
+  color: var(--accent-2);
+  flex-shrink: 0;
+  min-width: 88px;
+  letter-spacing: 0.2px;
+}
+.bc-summary {
+  flex: 1; min-width: 0;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.bc-chev {
+  font-size: 18px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* Estado vacío */
+.body-empty {
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 28px 22px;
+  text-align: center;
+  color: var(--muted);
+}
+.be-icon { font-size: 38px; line-height: 1; margin-bottom: 10px; opacity: 0.5; }
+.be-title { font-size: 15px; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
+.be-sub {
+  font-size: 12px; color: var(--muted);
+  line-height: 1.55; letter-spacing: 0.1px;
+  max-width: 380px; margin: 0 auto;
+}
+
+/* ============================================================================
+   Modal de registro · Body Form
+   ============================================================================ */
+.body-modal { /* hook por si el modal necesita altura mayor */ }
+
+.body-form {
+  display: flex; flex-direction: column;
+  gap: 18px;
+  padding-bottom: 8px;
+}
+.bf-section {
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+.bf-section-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 2px;
+}
+.bf-section-icon {
+  font-size: 14px;
+  color: var(--accent);
+  width: 18px; text-align: center;
+}
+.bf-section-title {
+  font-size: 11px; font-weight: 800;
+  color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 1.5px;
+}
+
+/* Fecha al principio del form */
+.bf-date {
+  width: 100%;
+  background: var(--neutral-bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 15px; font-weight: 600;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+.bf-date:focus { border-color: var(--accent); }
+
+/* Filas: list-style Apple — label izda, input dcha, unidad pequeña */
+.bf-rows {
+  background: var(--neutral-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.bf-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.bf-rows .bf-row:last-child { border-bottom: 0; }
+.bf-label {
+  flex: 1; min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: 0.1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bf-input-wrap {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.bf-input {
+  width: 76px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: 15px; font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 0;
+  font-family: inherit;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+.bf-input::placeholder {
+  color: var(--muted);
+  font-weight: 600;
+  opacity: 0.7;
+}
+.bf-input::-webkit-outer-spin-button,
+.bf-input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.bf-input:focus { color: var(--accent); }
+.bf-unit {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  min-width: 26px;
+  text-align: left;
+}
+
+/* Zonas personalizadas */
+.bf-row-custom { gap: 8px; }
+.bf-del {
+  background: transparent;
+  border: 0;
+  color: var(--bad);
+  font-size: 17px;
+  cursor: pointer;
+  padding: 0 4px;
+  font-family: inherit;
+}
+.bf-del:hover { color: #ef4444; }
+
+.bf-empty {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  padding: 12px 14px;
+  background: var(--neutral-bg);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  letter-spacing: 0.1px;
+}
+.bf-add-custom {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  color: var(--accent-2);
+  font-size: 13px; font-weight: 700;
+  padding: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+  transition: background .15s, border-style .15s;
+}
+.bf-add-custom:hover {
+  background: rgba(255,107,0,.06);
+  border-style: solid;
+}
+
+/* Notas */
+.bf-notes {
+  width: 100%;
+  background: var(--neutral-bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  min-height: 60px;
+  transition: border-color .15s;
+}
+.bf-notes:focus { border-color: var(--accent); }
+.bf-notes::placeholder { color: var(--muted); font-style: italic; }
+
+/* Footer del modal */
+.bf-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.bf-foot .btn { flex: 0 0 auto; }
+.bf-foot .btn.danger { margin-right: auto; }

@@ -458,6 +458,65 @@ export const Store = {
     return true;
   },
 
+  /* ============================================================================
+     ANTROPOMETRÍA · Body Measurements
+     ----------------------------------------------------------------------------
+     Cada medición es un objeto con `id`, `date` (ISO YYYY-MM-DD) y campos
+     numéricos opcionales. Las zonas custom van en `custom: {name: cm}`.
+     Backward-compat: usuarios sin la propiedad heredan array vacío al leer.
+     ============================================================================ */
+  bodyMeasurements() {
+    return (this.data.bodyMeasurements || []).slice()
+      .sort((a, b) => b.date.localeCompare(a.date));   // newest first
+  },
+
+  addBodyMeasurement(m) {
+    if (!this.data.bodyMeasurements) this.data.bodyMeasurements = [];
+    const out = { ...m, id: 'bm-' + Date.now() + '-' + Math.floor(Math.random() * 1000) };
+    this.data.bodyMeasurements.push(out);
+    this.save();
+    emit('body:added', out);
+    return out;
+  },
+
+  updateBodyMeasurement(id, patch) {
+    if (!this.data.bodyMeasurements) return;
+    const m = this.data.bodyMeasurements.find(x => x.id === id);
+    if (!m) return;
+    Object.assign(m, patch);
+    this.save();
+    emit('body:updated', m);
+  },
+
+  deleteBodyMeasurement(id) {
+    if (!this.data.bodyMeasurements) return false;
+    const before = this.data.bodyMeasurements.length;
+    this.data.bodyMeasurements = this.data.bodyMeasurements.filter(m => m.id !== id);
+    if (this.data.bodyMeasurements.length !== before) {
+      this.save();
+      emit('body:removed', id);
+      return true;
+    }
+    return false;
+  },
+
+  /** Última medición (la más reciente). Útil para placeholders del form. */
+  lastBodyMeasurement() {
+    const list = this.bodyMeasurements();
+    return list.length ? list[0] : null;
+  },
+
+  /** Nombres únicos de TODAS las zonas custom usadas alguna vez por el
+   *  usuario. Sirve para sugerirlas al añadir una nueva medición sin
+   *  forzarle a teclear el nombre cada vez ("Antebrazo", "Cuello"…). */
+  customBodyFieldNames() {
+    const names = new Set();
+    for (const m of (this.data.bodyMeasurements || [])) {
+      if (m.custom) Object.keys(m.custom).forEach(k => names.add(k));
+    }
+    return [...names].sort();
+  },
+
   setWorkoutReadiness(id, readiness) {
     const w = this.workoutById(id);
     if (!w) return;

@@ -191,6 +191,8 @@ export function seedData(oldSessions) {
     sessions,
     workouts: [],
     activeWorkoutId: null,
+    /* Antropometría — historial de mediciones corporales (Fase J·1). */
+    bodyMeasurements: [],
     settings: { lastRoutineId: null, defaultRest: 120 },
   };
 }

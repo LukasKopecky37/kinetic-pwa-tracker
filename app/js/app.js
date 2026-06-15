@@ -21,6 +21,7 @@ import { renderRoutine }  from './views/routine.js';
 import { renderHistory }  from './views/history.js';
 import { renderProgress } from './views/progress.js';
 import { renderAnalysis } from './views/analysis.js';
+import { renderBody }     from './views/body.js';
 import { openSettings }   from './views/settings.js';
 
 export const App = {
@@ -65,6 +66,7 @@ export const App = {
     renderHistory();
     renderProgress();
     renderAnalysis();
+    renderBody();
   },
 
   renderHeader() {
