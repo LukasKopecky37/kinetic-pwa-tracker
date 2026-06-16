@@ -821,6 +821,47 @@
 }
 .ed-item .ed-del:hover{ background:var(--bad-bg); }
 
+/* ----- Bi-serie (superset) en el editor de Día ----- */
+.ed-item .ed-ss-toggle{
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:8px;
+  background:var(--neutral-bg); border:1px dashed var(--line);
+  color:var(--muted); cursor:pointer;
+  padding:6px 10px; border-radius:8px;
+  font-size:11px; font-weight:700; letter-spacing:.2px;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.ed-item .ed-ss-toggle:hover{
+  background:var(--accent-bg); border-color:var(--accent); color:var(--accent-2);
+}
+.ed-item .ed-ss-toggle.on{
+  background:var(--accent-bg); border-style:solid;
+  border-color:var(--accent); color:var(--accent-2);
+}
+.ed-item .ed-ss-badge{
+  display:inline-flex; align-items:center;
+  font-size:10px; font-weight:700; color:var(--accent-2);
+  background:var(--accent-bg); border-radius:999px;
+  padding:2px 8px; letter-spacing:.2px;
+}
+
+/* Pareja: el primer ítem pierde el borde inferior, el segundo el superior,
+   y un acento naranja a la izquierda los une visualmente. */
+.ed-item.is-ss-first{
+  border-bottom-left-radius:0; border-bottom-right-radius:0;
+  border-bottom-color:transparent;
+  margin-bottom:0;
+  box-shadow:inset 3px 0 0 var(--accent);
+}
+.ed-item.is-ss-second{
+  border-top-left-radius:0; border-top-right-radius:0;
+  border-top:1px dashed var(--accent);
+  /* Absorbe el gap:6 del padre .ed-list para fusionar visualmente con el
+     primer ítem en un único bloque compacto. */
+  margin-top:-6px;
+  box-shadow:inset 3px 0 0 var(--accent);
+}
+
 /* ----- Library list rows ----- */
 .lib-row{
   background:var(--panel-2); border:1px solid var(--line);

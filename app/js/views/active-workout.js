@@ -52,12 +52,65 @@ let onResize = null;
 // terminar/cancelar o al abrir un workout distinto.
 let extraItems = [];
 let lastWorkoutId = null;
+/* === Bi-serie (superset) — estado del flujo intercalado ===
+ * Cuando el usuario completa el set N del SEGUNDO ejercicio de una bi-serie,
+ * pedimos al RestTimer que arranque y dejamos guardada aquí la pageIdx del
+ * PRIMER ejercicio para volver automáticamente al terminar el descanso.
+ * También guardamos `wasRunningRest` en el restRenderer para detectar el
+ * flanco running→idle (= "el rest acaba de terminar") sin tocar la API
+ * del RestTimer global. */
+let pendingSupersetReturn = null;
+let restWasRunning = false;
 
 /** Items del workout activo = los del día + los transitorios (sin duplicar). */
 function activeItems(routine) {
   const base = routine ? Store.itemsForDate(routine.id, date) : [];
   const seen = new Set(base.map(it => it.exerciseId));
   return [...base, ...extraItems.filter(it => !seen.has(it.exerciseId))];
+}
+
+/**
+ * Anota cada página con info de su bi-serie. Después de esta llamada cada
+ * página de ejercicio que forma parte de un par tiene:
+ *   page.superset = {
+ *     groupId,          // gid compartido
+ *     pairIndex: 0|1,   // 0 = ejercicio A (primero), 1 = ejercicio B (segundo)
+ *     partnerPageIdx,   // índice en `pages` del compañero
+ *   }
+ * Pages sin bi-serie no llevan el campo (undefined).
+ *
+ * Importante: el index en `pages` es items_idx + 1 porque pages[0] es la
+ * pantalla de calentamiento. La cleanup del Store ya garantiza que solo
+ * llegan aquí grupos válidos (par estricto + adyacentes en items[]).
+ */
+function decorateSupersets(items, pages) {
+  const groups = new Map();
+  items.forEach((it, i) => {
+    if (!it || !it.supersetGroupId) return;
+    if (!groups.has(it.supersetGroupId)) groups.set(it.supersetGroupId, []);
+    groups.get(it.supersetGroupId).push(i);
+  });
+  for (const [gid, idxs] of groups) {
+    if (idxs.length !== 2) continue;
+    const [aItem, bItem] = idxs[0] < idxs[1] ? idxs : [idxs[1], idxs[0]];
+    const aPage = pages[aItem + 1];
+    const bPage = pages[bItem + 1];
+    if (!aPage || !bPage) continue;
+    aPage.superset = { groupId: gid, pairIndex: 0, partnerPageIdx: bItem + 1 };
+    bPage.superset = { groupId: gid, pairIndex: 1, partnerPageIdx: aItem + 1 };
+
+    // Pista visual en el player: un chip arriba de cada página de la pareja.
+    const aPartnerName = bPage.ex ? bPage.ex.name : '';
+    const bPartnerName = aPage.ex ? aPage.ex.name : '';
+    const aChip = h('div', { class: 'aw-ss-chip', 'data-role': 'A' },
+      h('span', { class: 'aw-ss-tag' }, '🔗 Bi-serie · A'),
+      h('span', { class: 'aw-ss-sub' }, `tras esta serie: ${aPartnerName}`));
+    const bChip = h('div', { class: 'aw-ss-chip', 'data-role': 'B' },
+      h('span', { class: 'aw-ss-tag' }, '🔗 Bi-serie · B'),
+      h('span', { class: 'aw-ss-sub' }, `de ${bPartnerName}`));
+    if (aPage.el) aPage.el.insertBefore(aChip, aPage.el.firstChild);
+    if (bPage.el) bPage.el.insertBefore(bChip, bPage.el.firstChild);
+  }
 }
 
 const REST_RING = 326.726; // 2π·52
@@ -615,7 +668,43 @@ function buildPage(item, pageIdx) {
       } else {
         vibrate(15);
       }
-      RestTimer.start(restSec, ex.name);
+
+      /* ============================================================
+       * BI-SERIE — flujo intercalado A → B → rest → A
+       *
+       * Mi page real en `pages[]` = pageIdx + 1 (offset por warmup).
+       * Si esta página tiene metadata `superset`, decide:
+       *   - pairIndex 0 (soy A): si B tiene set i pendiente, NO arrancar
+       *     descanso; auto-swipe a B para meter el set i.
+       *   - pairIndex 1 (soy B): arrancar descanso normal, pero si A tiene
+       *     set i+1 pendiente, programar AUTO-VOLVER a A cuando el rest
+       *     termine. La vuelta se gestiona en `renderRest()` detectando el
+       *     flanco running→idle del RestTimer.
+       * Cualquier otro caso (mitad de pareja con compañero terminado,
+       * sin pareja, etc.) cae al comportamiento clásico: rest siempre.
+       * ============================================================ */
+      const myPage = pages[pageIdx + 1];
+      const ss = myPage && myPage.superset;
+      let suppressRest = false;
+      if (ss) {
+        const partner = pages[ss.partnerPageIdx];
+        const partnerRow = partner && partner.state && partner.state.rows[i];
+        if (ss.pairIndex === 0 && partnerRow && !partnerRow.done) {
+          // Soy A → salto a B para su set i sin disparar descanso.
+          suppressRest = true;
+          // Micro-delay para que el estado del botón se anime antes del swipe.
+          setTimeout(() => goTo(ss.partnerPageIdx), 120);
+        } else if (ss.pairIndex === 1) {
+          // Soy B → tras el rest, volver a A para su siguiente set.
+          const aNextRow = partner && partner.state && partner.state.rows[i + 1];
+          if (aNextRow && !aNextRow.done) {
+            pendingSupersetReturn = ss.partnerPageIdx;
+          }
+        }
+      }
+      if (!suppressRest) {
+        RestTimer.start(restSec, ex.name);
+      }
     } else {
       row.done = false;
       persist(state);
@@ -1046,6 +1135,7 @@ function rebuildPages(focusExId) {
   pages = items.length
     ? [buildWarmupPage(date), ...items.map((it, i) => buildPage(it, i))]
     : [];
+  decorateSupersets(items, pages);
 
   const track = $('#awTrack');
   if (track) mount(track, pages.map(p => p.el));
@@ -1217,9 +1307,25 @@ function renderRest(s) {
   if (!host) return;
   if (!s.running || s.remaining <= 0) {
     host.hidden = true;
+    /* AUTO-RETURN bi-serie:
+     * Si veníamos de un descanso CORRIENDO y ahora está idle (= acaba de
+     * terminar O lo saltó el usuario), y hay un `pendingSupersetReturn`
+     * pendiente del flujo intercalado, saltar a A. Se hace AQUÍ porque
+     * `RestTimer` es global y no queríamos meterle un callback acoplado al
+     * player; con la suscripción ya activa basta detectar el flanco.
+     * Si el usuario saltó manualmente "Saltar", también vuelve — es el
+     * comportamiento esperado: el descanso terminó, sigues con A. */
+    if (restWasRunning && pendingSupersetReturn != null) {
+      const target = pendingSupersetReturn;
+      pendingSupersetReturn = null;
+      // pequeño delay para que la anim del panel desaparezca limpia
+      setTimeout(() => goTo(target), 200);
+    }
+    restWasRunning = false;
     return;
   }
   host.hidden = false;
+  restWasRunning = true;     // estamos en running → arma el flanco para el próximo idle
   $('#awRestTime').textContent = fmtMMSS(s.remaining);
   $('#awRestName').textContent = s.exName || 'Descanso';
   const ring = host.querySelector('.aw-rest-ring');
@@ -1286,6 +1392,7 @@ export function openActiveWorkout() {
   pages = items.length
     ? [buildWarmupPage(date), ...items.map((it, i) => buildPage(it, i))]
     : [];
+  decorateSupersets(items, pages);
 
   // Decisión de la página inicial:
   //   - Workout NUEVO (ningún ejercicio iniciado todavía) → pages[0] = warmup.
@@ -1402,4 +1509,8 @@ export function closeActiveWorkout() {
   if (onResize) { window.removeEventListener('resize', onResize); onResize = null; }
   pages = [];
   idx = 0;
+  // Reset del flujo intercalado de bi-serie: si al cerrar/minimizar había
+  // un retorno programado a A, su pageIdx queda inválido. Lo borramos.
+  pendingSupersetReturn = null;
+  restWasRunning = false;
 }

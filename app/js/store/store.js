@@ -275,7 +275,11 @@ export const Store = {
 
   removeItemFromRoutine(routineId, idx) {
     const r = this.routineById(routineId);
-    if (r) { r.items.splice(idx, 1); this.save(); emit('routine:updated', r); }
+    if (r) {
+      r.items.splice(idx, 1);
+      cleanOrphanSupersetGroups(r);
+      this.save(); emit('routine:updated', r);
+    }
   },
 
   moveItemInRoutine(routineId, idx, dir) {
@@ -284,6 +288,7 @@ export const Store = {
     const ni = idx + dir;
     if (ni < 0 || ni >= r.items.length) return;
     [r.items[idx], r.items[ni]] = [r.items[ni], r.items[idx]];
+    cleanOrphanSupersetGroups(r);   // reordenar puede romper la adyacencia
     this.save();
     emit('routine:updated', r);
   },
@@ -291,6 +296,41 @@ export const Store = {
   updateItemInRoutine(routineId, idx, patch) {
     const r = this.routineById(routineId);
     if (r && r.items[idx]) { Object.assign(r.items[idx], patch); this.save(); emit('routine:updated', r); }
+  },
+
+  /**
+   * Bi-serie (superset) entre items[idx] y items[idx+1].
+   *
+   * Modelo: cada item puede llevar un `supersetGroupId` (string corto).
+   * Dos items con el MISMO id y CONSECUTIVOS en el array forman pareja.
+   * Restringimos a pares estrictos (no cadenas de 3+) para que el flujo
+   * intercalado A→B→rest→A sea inequívoco en el player.
+   *
+   * Toggle:
+   *   - Si idx y idx+1 ya comparten el mismo grupo → romper (ambos a null).
+   *   - Si no → asignar un nuevo grupo a ambos, sustituyendo cualquier
+   *     grupo previo que llevaran (sus antiguos compañeros quedarán
+   *     huérfanos y `cleanOrphanSupersetGroups` los libera).
+   * No-op si no hay items[idx+1].
+   */
+  toggleSupersetWithNext(routineId, idx) {
+    const r = this.routineById(routineId);
+    if (!r) return;
+    const a = r.items[idx];
+    const b = r.items[idx + 1];
+    if (!a || !b) return;
+    if (a.supersetGroupId && a.supersetGroupId === b.supersetGroupId) {
+      a.supersetGroupId = null;
+      b.supersetGroupId = null;
+    } else {
+      const gid = 'ss-' + Math.floor((this.data._supersetSeq || 0) + 1);
+      this.data._supersetSeq = (this.data._supersetSeq || 0) + 1;
+      a.supersetGroupId = gid;
+      b.supersetGroupId = gid;
+    }
+    cleanOrphanSupersetGroups(r);
+    this.save();
+    emit('routine:updated', r);
   },
 
   /**
@@ -591,3 +631,37 @@ export const Store = {
 
 // Re-export por conveniencia para el código que importe la constante.
 export { KEY };
+
+/* ============================================================================
+   Helpers internos
+   ============================================================================ */
+
+/**
+ * Garbage-collect de grupos de bi-serie en una rutina.
+ *
+ * Regla: un `supersetGroupId` es válido si y solo si exactamente DOS
+ * items lo llevan Y esos items son adyacentes en `r.items` (idx y idx+1
+ * en cualquier orden).
+ *
+ * Llamamos a esta función después de mutar la lista (remove/move) y
+ * después de cada toggle para liberar a cualquier item que se quede
+ * solo en su grupo o cuyo compañero ya no esté al lado. Cualquier
+ * id que no cumpla el contrato se borra (set a null) en sus portadores.
+ */
+function cleanOrphanSupersetGroups(routine) {
+  if (!routine || !Array.isArray(routine.items)) return;
+  // 1) Indexar miembros por grupo.
+  const groups = new Map();   // gid → [indices]
+  routine.items.forEach((it, i) => {
+    if (!it || !it.supersetGroupId) return;
+    if (!groups.has(it.supersetGroupId)) groups.set(it.supersetGroupId, []);
+    groups.get(it.supersetGroupId).push(i);
+  });
+  // 2) Validar cada grupo.
+  for (const [gid, idxs] of groups) {
+    const valid = idxs.length === 2 && Math.abs(idxs[0] - idxs[1]) === 1;
+    if (!valid) {
+      idxs.forEach(i => { routine.items[i].supersetGroupId = null; });
+    }
+  }
+}

@@ -200,6 +200,23 @@ export function openRoutineEditor(routineId) {
   const items = r.items.map((it, idx) => {
     const ex = Store.exerciseById(it.exerciseId);
     const itDays = it.days || [];
+    const next = r.items[idx + 1];
+    const prev = r.items[idx - 1];
+    // Bi-serie: el item está vinculado con el SIGUIENTE si comparte
+    // supersetGroupId con r.items[idx+1]; lo está con el ANTERIOR si lo
+    // comparte con r.items[idx-1]. Las clases CSS pintan el bloque unido.
+    const linkedNext = !!(it.supersetGroupId && next && next.supersetGroupId === it.supersetGroupId);
+    const linkedPrev = !!(it.supersetGroupId && prev && prev.supersetGroupId === it.supersetGroupId);
+    const ssClass = linkedNext ? ' is-ss-first' : (linkedPrev ? ' is-ss-second' : '');
+    const ssBadge = linkedPrev
+      ? '<span class="ed-ss-badge">↳ bi-serie con el anterior</span>'
+      : '';
+    // Botón toggle: visible siempre que exista un item siguiente.
+    const ssBtnLabel = linkedNext ? '✕ Romper bi-serie' : '🔗 Bi-serie con el siguiente';
+    const ssBtnHTML  = next
+      ? `<button class="ed-ss-toggle${linkedNext ? ' on' : ''}" type="button" data-itidx="${idx}">${ssBtnLabel}</button>`
+      : '';
+
     const dayOptions = (r.days || []).length > 1
       ? `<div class="ed-days">
            <span style="font-size:10px;color:var(--muted)">Día:</span>
@@ -208,7 +225,7 @@ export function openRoutineEditor(routineId) {
          </div>`
       : '';
     return `
-      <div class="ed-item" data-idx="${idx}">
+      <div class="ed-item${ssClass}" data-idx="${idx}">
         <div class="ed-handle">
           <button class="b-up" ${idx === 0 ? 'disabled' : ''}>▲</button>
           <button class="b-dn" ${idx === r.items.length - 1 ? 'disabled' : ''}>▼</button>
@@ -217,6 +234,7 @@ export function openRoutineEditor(routineId) {
           <div class="ed-name">
             ${ex ? escapeH(ex.name) : '⚠ borrado'}
             ${ex ? `<span class="ed-group">${escapeH(ex.group)}</span>` : ''}
+            ${ssBadge}
           </div>
           <div class="ed-fields">
             <label class="ed-f"><span class="ed-lab">Series</span>
@@ -227,6 +245,7 @@ export function openRoutineEditor(routineId) {
               <input class="i-rest" type="number" inputmode="numeric" min="10" step="15" value="${it.rest || 120}"></label>
           </div>
           ${dayOptions}
+          ${ssBtnHTML}
         </div>
         <button class="ed-del" title="Quitar">×</button>
       </div>
@@ -356,6 +375,19 @@ export function openRoutineEditor(routineId) {
         openRoutineEditor(routineId);
       });
     });
+
+    // Toggle de bi-serie con el siguiente ítem.
+    const ssBtn = el.querySelector('.ed-ss-toggle');
+    if (ssBtn) {
+      ssBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wasLinked = r.items[idx]?.supersetGroupId
+          && r.items[idx].supersetGroupId === r.items[idx + 1]?.supersetGroupId;
+        Store.toggleSupersetWithNext(routineId, idx);
+        toast(wasLinked ? 'Bi-serie deshecha' : 'Bi-serie creada');
+        openRoutineEditor(routineId);
+      });
+    }
   });
 
   $('#bDelRoute').addEventListener('click', () => {
