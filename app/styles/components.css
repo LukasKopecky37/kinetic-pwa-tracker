@@ -290,14 +290,28 @@
 }
 .empty{ text-align:center; color:var(--muted); padding:40px 20px; font-size:14px; }
 
-/* ----- History chips ----- */
-.hist-filter{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+/* ----- History chips -----
+   Bug fix (IMG_5513): en iOS Safari un <select> dentro de display:flex con
+   `flex:1` pero `min-width:auto` (default) NO se encoge por debajo del
+   ancho intrínseco de su <option> más larga. Si hay un ejercicio con
+   nombre largo (p.ej. "Sentadilla con barra"), el select se sale por la
+   derecha de la pantalla. Forzamos min-width:0 + width:100% + box-sizing
+   border-box, y blindamos el contenedor padre con overflow:hidden.
+   text-overflow:ellipsis acorta con "…" si el nombre supera el ancho. */
+.hist-filter{
+  display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;
+  width:100%; max-width:100%; box-sizing:border-box;
+  min-width:0; overflow:hidden;
+}
 .hist-filter select{
-  flex:1; background:var(--panel); color:var(--text);
+  flex:1 1 0; min-width:0; width:100%; max-width:100%;
+  box-sizing:border-box;
+  background:var(--panel); color:var(--text);
   border:1px solid var(--line); border-radius:var(--radius-sm);
-  padding:10px 12px; font-size:14px; -webkit-appearance:none;
+  padding:10px 12px; font-size:14px; -webkit-appearance:none; appearance:none;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%238a93a3' d='M0 0l5 6 5-6z'/></svg>");
   background-repeat:no-repeat; background-position:right 10px center; padding-right:28px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .hist-row{
   background:var(--panel); border:1px solid var(--line);
