@@ -216,11 +216,15 @@ body.aw-open .rest-panel { display: none !important; }
    - Modo NORMAL: 6 cols (n · kg · reps · rpe · check · del)
    - Modo SPLIT (Manos separadas): 6 cols pero distintas — RPE se oculta
      para dar espacio a L y R sin sacrificar legibilidad de los inputs.
-     (n · kg · L · R · check · del). */
+     (n · kg · L · R · check · del).
+   Distribución 2fr / 2fr / 1.2fr entre KG, REPS y RPE — KG y REPS exactamente
+   iguales (no pueden colapsar uno al otro), RPE algo más estrecho (es input
+   subjetivo y opcional, no necesita la misma anchura). minmax(0,…) impide
+   que el contenido intrínseco de los inputs fuerce overflow horizontal. */
 .aw-set-head,
 .aw-set {
   display: grid;
-  grid-template-columns: 28px minmax(0,1fr) minmax(0,1fr) 56px 50px 22px;
+  grid-template-columns: 28px minmax(0,2fr) minmax(0,2fr) minmax(0,1.2fr) 50px 22px;
   gap: 8px; align-items: center;
 }
 .aw-set-head.split,
@@ -261,12 +265,19 @@ body.aw-open .rest-panel { display: none !important; }
 /* Serie completada: inputs bloqueados temporalmente */
 .aw-set.is-completed .aw-in { opacity: .6; pointer-events: none; }
 
-/* Stepper de reps: [- N +] sin teclado nativo. Encaja en la columna 1fr. */
+/* Stepper de reps: [- N +] sin teclado nativo. Encaja en la columna 2fr.
+   IMPORTANTE: usa la MISMA altura que la pill de KG (.aw-w-stepper) para
+   que las dos columnas queden visualmente idénticas. align-items:center
+   (no stretch) → los botones mantienen su altura interna sin deformarse
+   verticalmente. min-height matchea el ancho de la pill de KG (input 16px
+   con padding 12px arriba/abajo + bordes ≈ 44px). */
 .aw-stepper {
   display: grid; grid-template-columns: 34px 1fr 34px;
-  gap: 4px; align-items: stretch;
+  gap: 4px; align-items: center;
   background: var(--neutral-bg); border: 1px solid transparent;
   border-radius: 8px; padding: 2px;
+  min-height: 44px;
+  box-sizing: border-box;
 }
 .aw-set.next .aw-stepper { border-color: var(--accent); }
 .aw-stepper .aw-step {
@@ -274,6 +285,7 @@ body.aw-open .rest-panel { display: none !important; }
   font-size: 20px; font-weight: 800; line-height: 1; cursor: pointer;
   border-radius: 6px; padding: 0;
   display: flex; align-items: center; justify-content: center;
+  height: 100%;                                 /* fill stepper para tap target cómodo */
   font-variant-numeric: tabular-nums;
   transition: background .12s, transform .1s;
 }
@@ -281,6 +293,7 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-stepper .aw-step:disabled { opacity: .4; cursor: not-allowed; }
 .aw-stepper .aw-step-val {
   display: flex; align-items: center; justify-content: center;
+  height: 100%;                                  /* fill vertical igual que los botones */
   font-size: 17px; font-weight: 700; color: var(--text);
   font-variant-numeric: tabular-nums; user-select: none;
   transition: color .15s, opacity .15s;
@@ -381,6 +394,8 @@ body.aw-open .rest-panel { display: none !important; }
   border: 1px solid transparent;
   border-radius: 8px;
   overflow: hidden;
+  min-height: 44px;                              /* MATCH .aw-stepper (REPS) */
+  box-sizing: border-box;
   transition: border-color .15s, background .15s;
 }
 .aw-w-stepper:focus-within {
