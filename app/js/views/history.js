@@ -10,7 +10,7 @@ import { fmtDate } from '../utils/date.js';
 import { fmtRepsCompact, escapeH } from '../utils/format.js';
 import { roman } from '../utils/roman.js';
 import { Store } from '../store/store.js';
-import { topWeight, topSet, isPR as isSessionPR } from '../analytics/prs.js';
+import { topWeight, topSet, bestSetVolume, isPR as isSessionPR } from '../analytics/prs.js';
 import { sessionVolume } from '../analytics/volume.js';
 import { estimate1RM, bestEstimated1RM } from '../analytics/one-rm.js';
 import { openModal, closeModal } from '../services/modal.js';
@@ -196,7 +196,24 @@ function buildHistRow(ex) {
     trendArrow = '·'; trendText = `${sessions.length} ses.`;
   }
 
-  const maxW = Math.max(...sessions.map(topWeight));
+  // PR ÚNICO POR EJERCICIO (refactor v48+):
+  // Bug previo (IMG_5514): el chip mostraba "PR" en TODAS las sesiones que
+  // empataban el peso máximo histórico. Ahora el criterio es:
+  //   - Métrica: bestSetVolume(s) = max(peso × reps) de los work-sets.
+  //   - El badge sale en UNA sola sesión: la del récord histórico real.
+  //   - En empate exacto gana la EARLIEST (la que estableció el récord);
+  //     el array `sessions` viene ASC, así que el primer ocurrente del
+  //     máximo es la pionera.
+  // Si todas las sesiones tienen volumen 0 (ej. solo warm-ups), no hay PR.
+  let prSessionId = null;
+  let prVol = 0;
+  for (const s of sessions) {
+    const v = bestSetVolume(s);
+    if (v > prVol) {           // ESTRICTAMENTE mayor → tie-break a la primera
+      prVol = v;
+      prSessionId = s.id;
+    }
+  }
 
   // IMPORTANTE: el array `sessions` viene ASC (más antigua → más reciente).
   // Calculamos el trend de cada chip COMPARANDO con la sesión anterior en
@@ -213,7 +230,7 @@ function buildHistRow(ex) {
       if (thisTop > prevTop)      trend = 'up';
       else if (thisTop < prevTop) trend = 'down';
     }
-    const isPRChip = thisTop > 0 && thisTop === maxW;
+    const isPRChip = prSessionId != null && s.id === prSessionId;
     return HistoryChip({
       session: s, trend, isPR: isPRChip,
       onTap: () => openEditSession(ex, s),

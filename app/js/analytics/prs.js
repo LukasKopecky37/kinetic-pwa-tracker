@@ -69,20 +69,30 @@ export function sessionTotalVolume(session) {
 }
 
 /**
- * ¿Es PR esta sesión? Comparada con todas las sesiones del mismo ejercicio
- * ≤ su fecha (excluyéndose ella misma).
+ * ¿Es PR esta sesión? — REGLA ESTRICTA (refactor v48+):
  *
- * Devuelve true si CUALQUIERA de estas 3 métricas es ESTRICTAMENTE mayor
- * que el récord previo:
- *   1. Peso máximo (top set) — el clásico
- *   2. Mejor set por volumen (peso × reps de un solo set) — usuario rompe
- *      el récord en una serie de "máximo esfuerzo concentrado"
- *   3. Volumen total de la sesión (Σ peso × reps) — el usuario suma más
- *      trabajo acumulado que en cualquier sesión previa
+ * Métrica única: **Mejor Set por Volumen** = max(peso × reps) entre los
+ * sets de trabajo (sin warm-ups) de la sesión.
  *
- * Razón: el usuario percibe como "PR" cualquiera de los tres. Limitarlo
- * al peso máximo apagaba el dopamine loop cuando el atleta hacía más reps
- * al mismo peso (mejorando volumen) sin subir la barra.
+ * Devuelve true si y solo si esa métrica es ESTRICTAMENTE mayor que la
+ * misma métrica calculada en CADA sesión previa o coincidente en fecha
+ * (excluyéndose ella misma). En caso de empate exacto NO es PR: el récord
+ * pertenece a la sesión que lo estableció primero.
+ *
+ * Por qué se eliminaron las métricas "top weight" y "volumen total":
+ *   - El usuario reportó (IMG_5514) que el badge "PR" salía repetido en
+ *     varias sesiones porque cualquiera de las 3 métricas activaba el
+ *     flag. Si tres sesiones acababan con el mismo top weight, las tres
+ *     se marcaban como PR.
+ *   - El criterio "peso × reps del mejor set" captura tanto el avance de
+ *     carga como el avance de reps al mismo peso (el dopamine loop sigue
+ *     activo) sin sobrecontar.
+ *
+ * NOTA: aplicar dedupe global "único PR por ejercicio" no es trabajo de
+ * esta función — `isPR(s, sessions)` responde "¿s rompió el récord en su
+ * momento?". El renderizador (history.js) puede elegir mostrar SOLO el
+ * último PR histórico filtrando con `bestSetVolume`. Ambos contratos se
+ * mantienen coherentes.
  *
  * @param {{id:number|string, date:string, sets:Array}} session
  * @param {Array<object>} exerciseSessions
@@ -90,21 +100,21 @@ export function sessionTotalVolume(session) {
  */
 export function isPR(session, exerciseSessions) {
   if (!session?.sets?.length) return false;
-  const prev = (exerciseSessions || []).filter(
-    x => x.id !== session.id && x.date <= session.date
-  );
-
-  // Métrica 1: peso máximo (top set)
-  const w  = topWeight(session);
-  if (w > 0 && prev.every(p => topWeight(p) < w)) return true;
-
-  // Métrica 2: mejor set por volumen (peso × reps de UN set)
   const bv = bestSetVolume(session);
-  if (bv > 0 && prev.every(p => bestSetVolume(p) < bv)) return true;
+  if (bv <= 0) return false;
 
-  // Métrica 3: volumen total de la sesión (Σ peso × reps)
-  const tv = sessionTotalVolume(session);
-  if (tv > 0 && prev.every(p => sessionTotalVolume(p) < tv)) return true;
-
-  return false;
+  // "Previa o coincidente": fecha < ó (misma fecha pero id léxicamente
+  // menor). El id monotónico (Store._sessionSeq) garantiza orden estable
+  // entre sesiones del mismo día. Una sesión que iguala el récord no es
+  // PR: el flag pertenece a la pionera.
+  const sid = String(session.id);
+  const sdate = session.date;
+  for (const x of (exerciseSessions || [])) {
+    if (x.id === session.id) continue;
+    const earlier =
+      x.date < sdate || (x.date === sdate && String(x.id) < sid);
+    if (!earlier) continue;
+    if (bestSetVolume(x) >= bv) return false;
+  }
+  return true;
 }
