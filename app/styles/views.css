@@ -821,44 +821,67 @@
 }
 .ed-item .ed-del:hover{ background:var(--bad-bg); }
 
-/* ----- Bi-serie (superset) en el editor de Día ----- */
-.ed-item .ed-ss-toggle{
-  display:inline-flex; align-items:center; gap:6px;
-  margin-top:8px;
-  background:var(--neutral-bg); border:1px dashed var(--line);
-  color:var(--muted); cursor:pointer;
-  padding:6px 10px; border-radius:8px;
-  font-size:11px; font-weight:700; letter-spacing:.2px;
-  transition:background .12s, border-color .12s, color .12s;
-}
-.ed-item .ed-ss-toggle:hover{
-  background:var(--accent-bg); border-color:var(--accent); color:var(--accent-2);
-}
-.ed-item .ed-ss-toggle.on{
-  background:var(--accent-bg); border-style:solid;
-  border-color:var(--accent); color:var(--accent-2);
-}
-.ed-item .ed-ss-badge{
+/* ----- Bi-serie (superset) en el editor de Día -----
+   Diseño: entre cada par de tarjetas consecutivas vive un CONECTOR
+   horizontal con dos líneas y un botón central "🔗 Unir como bi-serie".
+   Al activarse, el conector se vuelve naranja sólido y las dos tarjetas
+   adyacentes se fusionan (sin esquinas redondeadas en el borde común).
+*/
+.ed-ss-badge{
   display:inline-flex; align-items:center;
   font-size:10px; font-weight:700; color:var(--accent-2);
   background:var(--accent-bg); border-radius:999px;
   padding:2px 8px; letter-spacing:.2px;
 }
+.ed-ss-connector{
+  display:flex; align-items:center; gap:10px;
+  /* Cancela el gap:6 del padre .ed-list por ambos lados para que el
+     conector quede pegado a las tarjetas que une (parece una cuerda
+     entre ellas, no un elemento flotante). */
+  margin:-6px 0;
+  padding:2px 0;
+  min-height:34px;
+}
+.ed-ss-connector .ssc-line{
+  flex:1 1 0; height:0;
+  border-top:1px dashed var(--line);
+  transition:border-color .15s;
+}
+.ed-ss-connector .ssc-btn{
+  background:var(--neutral-bg); border:1px dashed var(--line);
+  color:var(--muted); cursor:pointer;
+  padding:7px 14px; border-radius:999px;
+  font-size:11px; font-weight:700; letter-spacing:.3px;
+  white-space:nowrap;
+  transition:background .15s, border-color .15s, color .15s, transform .1s;
+}
+.ed-ss-connector .ssc-btn:hover{
+  background:var(--accent-bg); border-color:var(--accent); color:var(--accent-2);
+}
+.ed-ss-connector .ssc-btn:active{ transform:scale(.96); }
+.ed-ss-connector.linked .ssc-line{
+  border-top:2px solid var(--accent);
+}
+.ed-ss-connector.linked .ssc-btn{
+  background:var(--accent); border-color:var(--accent); border-style:solid;
+  color:#1a0a00;
+  box-shadow:0 0 0 1px rgba(255,107,0,.35);
+}
+.ed-ss-connector.linked .ssc-btn:hover{
+  filter:brightness(1.05);
+}
 
 /* Pareja: el primer ítem pierde el borde inferior, el segundo el superior,
-   y un acento naranja a la izquierda los une visualmente. */
+   y un acento naranja a la izquierda los une visualmente. El conector
+   entre medias arrastra los gaps con margin negativo (arriba). */
 .ed-item.is-ss-first{
   border-bottom-left-radius:0; border-bottom-right-radius:0;
   border-bottom-color:transparent;
-  margin-bottom:0;
   box-shadow:inset 3px 0 0 var(--accent);
 }
 .ed-item.is-ss-second{
   border-top-left-radius:0; border-top-right-radius:0;
   border-top:1px dashed var(--accent);
-  /* Absorbe el gap:6 del padre .ed-list para fusionar visualmente con el
-     primer ítem en un único bloque compacto. */
-  margin-top:-6px;
   box-shadow:inset 3px 0 0 var(--accent);
 }
 

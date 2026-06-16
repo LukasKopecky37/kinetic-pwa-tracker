@@ -197,24 +197,28 @@ export function openRoutineEditor(routineId) {
     .map(d => `<button class="day-chip" data-d="${d}">${DAY_SHORT[d]}</button>`).join('');
   const dayList = (r.days || []).map(d => DAY_SHORT[d]).join(' · ') || 'sin días';
 
-  const items = r.items.map((it, idx) => {
+  // Render alternando tarjetas y conectores de bi-serie.
+  //
+  // UX: el botón de "unir como bi-serie" vive ENTRE dos tarjetas
+  // consecutivas, no dentro de una tarjeta. Visualmente eso comunica
+  // mucho mejor el concepto de "emparejar A con B" — el usuario ve un
+  // eslabón flotante que une las dos tarjetas, y al pulsarlo las
+  // tarjetas se fusionan en un bloque compacto.
+  //
+  // Cuando un par YA está enlazado, el conector se vuelve naranja sólido
+  // con texto "🔗 Bi-serie · pulsa para romper" y las dos tarjetas
+  // adyacentes pierden esquinas redondeadas para fundirse en un bloque.
+
+  const renderCard = (it, idx) => {
     const ex = Store.exerciseById(it.exerciseId);
     const itDays = it.days || [];
     const next = r.items[idx + 1];
     const prev = r.items[idx - 1];
-    // Bi-serie: el item está vinculado con el SIGUIENTE si comparte
-    // supersetGroupId con r.items[idx+1]; lo está con el ANTERIOR si lo
-    // comparte con r.items[idx-1]. Las clases CSS pintan el bloque unido.
     const linkedNext = !!(it.supersetGroupId && next && next.supersetGroupId === it.supersetGroupId);
     const linkedPrev = !!(it.supersetGroupId && prev && prev.supersetGroupId === it.supersetGroupId);
     const ssClass = linkedNext ? ' is-ss-first' : (linkedPrev ? ' is-ss-second' : '');
     const ssBadge = linkedPrev
-      ? '<span class="ed-ss-badge">↳ bi-serie con el anterior</span>'
-      : '';
-    // Botón toggle: visible siempre que exista un item siguiente.
-    const ssBtnLabel = linkedNext ? '✕ Romper bi-serie' : '🔗 Bi-serie con el siguiente';
-    const ssBtnHTML  = next
-      ? `<button class="ed-ss-toggle${linkedNext ? ' on' : ''}" type="button" data-itidx="${idx}">${ssBtnLabel}</button>`
+      ? '<span class="ed-ss-badge">↳ bi-serie</span>'
       : '';
 
     const dayOptions = (r.days || []).length > 1
@@ -245,12 +249,34 @@ export function openRoutineEditor(routineId) {
               <input class="i-rest" type="number" inputmode="numeric" min="10" step="15" value="${it.rest || 120}"></label>
           </div>
           ${dayOptions}
-          ${ssBtnHTML}
         </div>
         <button class="ed-del" title="Quitar">×</button>
       </div>
     `;
-  }).join('');
+  };
+
+  const renderConnector = (idx) => {
+    const it = r.items[idx];
+    const next = r.items[idx + 1];
+    const linked = !!(it.supersetGroupId && next && next.supersetGroupId === it.supersetGroupId);
+    const label = linked
+      ? '🔗 Bi-serie activa · pulsa para romper'
+      : '🔗 Unir como bi-serie';
+    return `
+      <div class="ed-ss-connector${linked ? ' linked' : ''}" data-itidx="${idx}">
+        <div class="ssc-line"></div>
+        <button class="ssc-btn" type="button" data-itidx="${idx}">${label}</button>
+        <div class="ssc-line"></div>
+      </div>
+    `;
+  };
+
+  const itemsAndConnectors = [];
+  r.items.forEach((it, idx) => {
+    itemsAndConnectors.push(renderCard(it, idx));
+    if (idx < r.items.length - 1) itemsAndConnectors.push(renderConnector(idx));
+  });
+  const items = itemsAndConnectors.join('');
 
   const metaBlock = _reMetaOpen ? `
       <div class="field" style="margin-bottom:10px"><label>Nombre del día</label>
@@ -376,18 +402,21 @@ export function openRoutineEditor(routineId) {
       });
     });
 
-    // Toggle de bi-serie con el siguiente ítem.
-    const ssBtn = el.querySelector('.ed-ss-toggle');
-    if (ssBtn) {
-      ssBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const wasLinked = r.items[idx]?.supersetGroupId
-          && r.items[idx].supersetGroupId === r.items[idx + 1]?.supersetGroupId;
-        Store.toggleSupersetWithNext(routineId, idx);
-        toast(wasLinked ? 'Bi-serie deshecha' : 'Bi-serie creada');
-        openRoutineEditor(routineId);
-      });
-    }
+  });
+
+  // Conectores entre tarjetas (bi-serie). Viven FUERA del bucle de ed-items
+  // porque son hermanos suyos, no hijos.
+  $$('#edList .ed-ss-connector .ssc-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.itidx, 10);
+      if (!Number.isFinite(idx)) return;
+      const wasLinked = !!(r.items[idx]?.supersetGroupId
+        && r.items[idx].supersetGroupId === r.items[idx + 1]?.supersetGroupId);
+      Store.toggleSupersetWithNext(routineId, idx);
+      toast(wasLinked ? 'Bi-serie deshecha' : 'Bi-serie creada');
+      openRoutineEditor(routineId);
+    });
   });
 
   $('#bDelRoute').addEventListener('click', () => {
