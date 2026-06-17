@@ -272,7 +272,7 @@ body.aw-open .rest-panel { display: none !important; }
    verticalmente. min-height matchea el ancho de la pill de KG (input 16px
    con padding 12px arriba/abajo + bordes ≈ 44px). */
 .aw-stepper {
-  display: grid; grid-template-columns: 34px 1fr 34px;
+  display: grid; grid-template-columns: 36px 1fr 36px;
   gap: 4px; align-items: center;
   background: var(--neutral-bg); border: 1px solid transparent;
   border-radius: 8px; padding: 2px;
@@ -281,9 +281,22 @@ body.aw-open .rest-panel { display: none !important; }
 }
 .aw-set.next .aw-stepper { border-color: var(--accent); }
 .aw-stepper .aw-step {
+  /* FIX glyph clipping (IMG_5522): a 20px + weight 800 el glyph del "+" en
+     iOS Safari mide ~13px y, con padding:0 y la celda en 34px, la punta
+     derecha del trazo horizontal toca el borde y se ve cortada (sobre todo
+     en pantallas con escalado denso). Solución:
+       1. Celda 34→36px → 1px extra a cada lado del glyph.
+       2. weight 800→700 → trazo menos grueso, glyph 1-2px más estrecho.
+       3. font-size 20→18 → glyph un punto más bajo (sigue clarísimo).
+       4. min-width explícito → blinda el tap target si en el futuro algo
+          cambia la columna padre.
+       5. padding 0 → 0 2px → micro-respiración interna garantizada.
+     El componente se ve idéntico a primera vista pero el "+" ya no muerde. */
   background: transparent; border: 0; color: var(--accent-2);
-  font-size: 20px; font-weight: 800; line-height: 1; cursor: pointer;
-  border-radius: 6px; padding: 0;
+  font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer;
+  border-radius: 6px;
+  padding: 0 2px;
+  min-width: 32px;
   display: flex; align-items: center; justify-content: center;
   height: 100%;                                 /* fill stepper para tap target cómodo */
   font-variant-numeric: tabular-nums;
@@ -314,11 +327,18 @@ body.aw-open .rest-panel { display: none !important; }
    Buttons 18px en vez de 34px → cabe 18+18+gap = ~40px y deja ~25px
    para el valor numérico en una columna 1fr de ~67px. */
 .aw-stepper.aw-stepper-mini {
-  grid-template-columns: 18px 1fr 18px;
+  grid-template-columns: 20px 1fr 20px;       /* 18→20: 1px extra cada lado del "+" */
   gap: 2px;
   padding: 1px;
 }
-.aw-stepper.aw-stepper-mini .aw-step { font-size: 14px; }
+.aw-stepper.aw-stepper-mini .aw-step {
+  /* min-width:32px del padre rompería la grid de 20px → reset explícito.
+     padding 0 para no comerse aún más espacio en una celda tan estrecha. */
+  min-width: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
 .aw-stepper.aw-stepper-mini .aw-step-val { font-size: 14px; }
 
 /* === Toggle "Manos separadas" — strip + iOS-style switch === */
@@ -420,19 +440,30 @@ body.aw-open .rest-panel { display: none !important; }
 }
 
 .aw-w-step {
-  /* 22px ancho — encaja en columna KG (1fr ~ 72px en iPhone 14 Pro) dejando
-     ~28px para el input. Tappable en gym a pesar de su tamaño compacto. */
-  width: 22px; min-width: 22px;
+  /* FIX glyph clipping (IMG_5522):
+     Antes 22px @ font-weight 800 + font-size 15: el wrapper padre tiene
+     overflow:hidden y el "+" extra-bold se pegaba al borde derecho, dando
+     la sensación de estar cortado.
+     Cambios:
+       - 22→26px de ancho (4px extra de respiración horizontal).
+       - font-weight 800→700 → glyph 1-2px más estrecho.
+       - font-size 15→14 → un punto más bajo, sigue legible en el gym.
+       - padding 0→0 2px → caja interna respira aunque el glyph se mueva
+         1px por subpixel rendering de iOS Safari.
+     El input central pierde 8px en total (4 por lado) → del orden de
+     pasar de ~28 a ~20px de ancho real para los dígitos; con pesos
+     ≤999.5 sigue cabiendo (4 dígitos + decimal en tabular-nums). */
+  width: 26px; min-width: 26px;
   background: transparent;
   border: 0;
   color: var(--accent-2);
-  font-size: 15px; font-weight: 800;
+  font-size: 14px; font-weight: 700;
   cursor: pointer;
   font-family: inherit;
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   line-height: 1;
-  padding: 0;
+  padding: 0 2px;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: background .12s, color .12s, transform .1s;
