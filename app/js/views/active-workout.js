@@ -376,6 +376,20 @@ function buildPage(item, pageIdx) {
     }),
   }, 'Tips');
 
+  /* === Chip "ÚLTIMA" dinámico (refactor v53+) ===
+   * Antes mostraba SIEMPRE el `lastTop` (mejor serie de la sesión previa)
+   * durante todo el ejercicio. El usuario reportó (IMG_5521/5523) que eso
+   * no le servía: necesita ver el reflejo de la SERIE concreta en la que
+   * está trabajando ahora mismo. Por ejemplo, si ya cerró la serie 1 con
+   * check verde y pasa el foco a la serie 2, el chip debe pasar de
+   * "65 kg × 12" (lo que hizo la semana pasada en S1) a "65 kg × 8" (lo
+   * que hizo en S2). Esto convierte ÚLTIMA en un espejo serie-por-serie.
+   *
+   * Implementación: capturamos un ref vivo al <b> del valor y exponemos
+   * `updateLastChip()`. Lo llamamos en el render inicial y en cada mutación
+   * que cambie el foco — toggleDone (✓/reabrir), removeRow (×), addBtn
+   * (+ añadir serie). Resto del flujo sin cambios. */
+  const lastValueEl = last ? h('b', null, '') : null;
   const head = h('div', { class: 'aw-ex-head' },
     h('div', { class: 'aw-ex-titles' },
       h('div', { class: 'aw-ex-name-row' },
@@ -389,10 +403,33 @@ function buildPage(item, pageIdx) {
       last
         ? h('div', null,
             h('span', { class: 'aw-last-cap' }, 'última'),
-            h('b', null, fmtTopSet(lastTop)))
+            lastValueEl,
+          )
         : h('span', { class: 'aw-last-cap' }, 'sin registros'),
     ),
   );
+
+  /**
+   * Recalcula el contenido del chip ÚLTIMA según la fila con foco actual.
+   * - Foco = primera fila no-done (la "siguiente serie" que el player
+   *   resalta en naranja). Si todas están hechas → reflejo de la última fila
+   *   como cierre, para mantener una referencia útil en pantalla.
+   * - El reflejo histórico de cada fila lo da `lastSetForRow(i)`, que ya
+   *   aplica fallback: si la sesión pasada tuvo N series y hoy haces N+k,
+   *   las filas extra heredan la última serie histórica.
+   * - Si NO hay sesión previa (`!last`), el chip muestra "sin registros"
+   *   desde el render inicial — no hay nada que actualizar.
+   */
+  function updateLastChip() {
+    if (!last || !lastValueEl) return;
+    const firstUndone = state.rows.findIndex(r => !r.done);
+    const focusIdx = firstUndone === -1
+      ? state.rows.length - 1   // todas hechas → reflejo de la última fila
+      : firstUndone;
+    const ref = lastSetForRow(focusIdx);
+    lastValueEl.textContent = ref ? fmtTopSet(ref) : '—';
+  }
+  updateLastChip();
 
   // ---- Lista de series (Módulo 2: fila limpia + check circular) ----
   const setsHost = h('div', { class: 'aw-sets' });
@@ -648,6 +685,11 @@ function buildPage(item, pageIdx) {
 
   function renderSets() {
     mount(setsHost, [headRow(), ...state.rows.map(rowEl)]);
+    // El chip ÚLTIMA del header refleja la fila CON FOCO (primera no-done).
+    // renderSets() se llama tras cada mutación de filas (✓, ×, + añadir,
+    // toggle split, override) → mantener el refresh aquí cubre todos los
+    // callsites con una sola línea, sin hooks ad-hoc.
+    updateLastChip();
   }
 
   function toggleDone(i, btn) {
