@@ -24,6 +24,60 @@ export function topWeight(session) {
   return top;
 }
 
+/* ============================================================================
+ * Modo unilateral estricto (is_unilateral): los sets pueden llevar
+ * weightL, weightR, repsL, repsR. `weight` y `reps` se mantienen como
+ * campos derivados (max / suma) para compatibilidad. Los helpers de
+ * abajo proyectan un set sobre UN lado ('L' o 'R') con fallback al
+ * campo plano si no hay registro per-side. Eso permite a los charts y
+ * a la Bitácora pintar I y D por separado SIN tocar la analítica clásica.
+ * ========================================================================== */
+
+/** Peso de UN lado de la serie ('L'|'R'); fallback al weight plano. */
+export function setSideWeight(set, side) {
+  const k = side === 'L' ? 'weightL' : 'weightR';
+  const v = set?.[k];
+  if (v != null && v !== '') return +v || 0;
+  return +(set?.weight) || 0;
+}
+/** Reps de UN lado de la serie; fallback al `reps` plano si no hay split. */
+export function setSideReps(set, side) {
+  const k = side === 'L' ? 'repsL' : 'repsR';
+  const v = set?.[k];
+  if (v != null && v !== '') return +v || 0;
+  // Sin split: 'reps' representa el total bilateral; no es comparable per lado.
+  // Devuelve 0 para no inflar gráficos unilaterales con datos pre-split.
+  if (set?.repsL != null || set?.repsR != null) return 0;
+  return +(set?.reps) || 0;
+}
+/** Top set de UN lado (peso×reps de la mejor serie de ese lado). */
+export function topSetSide(session, side) {
+  let best = null;
+  for (const set of (session?.sets || [])) {
+    if (set.warmup) continue;
+    const r = setSideReps(set, side);
+    if (!r) continue;
+    const w = setSideWeight(set, side);
+    if (!best ||
+        w > best.weight ||
+        (w === best.weight && r > best.reps)) {
+      best = { weight: w, reps: r };
+    }
+  }
+  return best;
+}
+/** Volumen total de la sesión por UN lado: Σ(w_side × r_side). */
+export function sessionVolumeSide(session, side) {
+  let v = 0;
+  for (const set of (session?.sets || [])) {
+    if (set.warmup) continue;
+    const r = setSideReps(set, side);
+    if (!r) continue;
+    v += setSideWeight(set, side) * r;
+  }
+  return v;
+}
+
 /**
  * El set más "pesado" de la sesión (mayor peso; desempate por más reps).
  * Útil para chips de historial y para el dato "top set" de la sesión.

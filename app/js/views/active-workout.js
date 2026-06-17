@@ -158,11 +158,20 @@ function persist(state) {
       if (r.rpe != null && r.rpe !== '' && !isNaN(parseFloat(r.rpe))) {
         out.rpe = parseFloat(r.rpe);
       }
-      // === Persistencia del modo "Manos separadas" ===
+      // === Persistencia del modo "Manos separadas" (is_unilateral) ===
       // Escribimos repsL/repsR si EITHER se ha rellenado (independiente del
       // flag actual). Eso preserva los datos históricos aunque el usuario
       // luego desactive split. La invariante `reps = repsL + repsR` se
       // mantiene → toda la analítica existente sigue funcionando sin tocar.
+      //
+      // weightL/weightR (refactor unilateral estricto): cuando hay split
+      // activo, además del campo `weight` plano (que conservamos como
+      // `max(weightL, weightR)` para PR/top-set globales), persistimos
+      // el peso ESPECÍFICO de cada lado. Por ahora la UI usa un único
+      // input de peso → weightL = weightR = weight. La estructura de
+      // datos queda futura-proof para inputs por lado en una siguiente
+      // iteración, y la Bitácora + charts duales pueden leer los lados
+      // por separado sin más cambios.
       const L = intify(r.repsL);
       const R = intify(r.repsR);
       const hasL = Number.isFinite(L) && L >= 0 && r.repsL !== '';
@@ -171,6 +180,23 @@ function persist(state) {
         out.repsL = hasL ? L : 0;
         out.repsR = hasR ? R : 0;
         out.reps  = out.repsL + out.repsR;
+      }
+      // Si la fila tiene weightL/weightR explícitos (futura UI por lado),
+      // los respetamos; si no, espejamos `weight` en ambos lados cuando
+      // hay split activo en el ejercicio. Eso garantiza que cada set
+      // unilateral tenga DOS pesos consultables independientes.
+      const wL = numify(r.weightL);
+      const wR = numify(r.weightR);
+      const hasWL = Number.isFinite(wL) && wL >= 0 && r.weightL !== '' && r.weightL != null;
+      const hasWR = Number.isFinite(wR) && wR >= 0 && r.weightR !== '' && r.weightR != null;
+      if (hasWL || hasWR) {
+        out.weightL = hasWL ? wL : numify(r.weight);
+        out.weightR = hasWR ? wR : numify(r.weight);
+        out.weight  = Math.max(out.weightL, out.weightR);
+      } else if (state.split) {
+        // split activo, sin inputs per-side todavía → espejamos el peso.
+        out.weightL = numify(r.weight);
+        out.weightR = numify(r.weight);
       }
       return out;
     })

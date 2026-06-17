@@ -122,14 +122,60 @@ function buildBitacoraRow(sess, routine) {
   const name = ex ? ex.name : '⚠ borrado';
   const item = routine?.items.find(it => it.exerciseId === sess.exerciseId);
   const target = item ? `${item.sets}×${item.repRange}` : '';
+  // Detección de modo unilateral estricto: el ejercicio tiene la marca
+  // `unilateralSplit` (= is_unilateral) Y la sesión tiene AL MENOS UN set
+  // con datos per-side. El segundo guard evita ensuciar la Bitácora cuando
+  // un ejercicio fue marcado como unilateral DESPUÉS de tener sesiones
+  // bilaterales planas.
+  const hasSplitData = (sess.sets || []).some(s =>
+    !s.warmup && (s.repsL != null || s.repsR != null
+                  || s.weightL != null || s.weightR != null));
+  const isUnilateral = !!(ex?.unilateralSplit && hasSplitData);
+
   return h('div', {
-    class: 'bit-row',
+    class: 'bit-row' + (isUnilateral ? ' split' : ''),
     onClick: () => ex && openEditSession(ex, sess),
   },
     h('div', { class: 'bit-name' }, name),
     h('div', { class: 'bit-target' }, target),
-    h('div', { class: 'bit-vals' }, fmtSetsBitacora(sess.sets)),
+    isUnilateral
+      ? h('div', { class: 'bit-vals bit-vals-split' },
+          h('div', { class: 'bv-side' },
+            h('span', { class: 'bv-tag' }, 'I'),
+            h('span', { class: 'bv-data' }, fmtSetsBitacoraSide(sess.sets, 'L'))),
+          h('div', { class: 'bv-side' },
+            h('span', { class: 'bv-tag' }, 'D'),
+            h('span', { class: 'bv-data' }, fmtSetsBitacoraSide(sess.sets, 'R'))),
+        )
+      : h('div', { class: 'bit-vals' }, fmtSetsBitacora(sess.sets)),
   );
+}
+
+/**
+ * Misma fórmula compacta que fmtSetsBitacora pero leyendo UN lado
+ * (Izquierda 'L' o Derecha 'R'). Si un set no tiene datos de ese lado
+ * (ej. sets antiguos pre-split mezclados con sets nuevos per-side), lo
+ * OMITE para no inventar ceros. El fallback al `weight` plano cubre el
+ * caso "split de reps con peso compartido" que es la persistencia actual.
+ */
+function fmtSetsBitacoraSide(sets, side) {
+  const repsKey = side === 'L' ? 'repsL' : 'repsR';
+  const wKey    = side === 'L' ? 'weightL' : 'weightR';
+  const valid = (sets || []).filter(s => {
+    if (s.warmup) return false;
+    const r = s[repsKey];
+    return r != null && r !== '' && +r > 0;
+  });
+  if (!valid.length) return '—';
+  const wOf = (s) => {
+    const v = s[wKey];
+    return v != null && v !== '' ? +v : +(s.weight || 0);
+  };
+  const w0 = wOf(valid[0]);
+  const same = valid.every(s => wOf(s) === w0);
+  return same
+    ? `${w0} kg · ${valid.map(s => s[repsKey]).join(' / ')}`
+    : valid.map(s => `${wOf(s)}×${s[repsKey]}`).join(' · ');
 }
 
 /** "62 kg · 12 / 12 / 10 / 8" si todas las series comparten peso; si varían,

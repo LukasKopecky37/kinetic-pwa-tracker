@@ -64,6 +64,15 @@ export function renderProgress() {
 
   if (chart)    chart.destroy();
   if (chartVol) chartVol.destroy();
-  chart    = renderProgressChart($('#chartCanvas'), sessions, avgPos);
-  chartVol = renderExerciseVolumeChart($('#volumeCanvas'), sessions);
+  // Modo unilateral estricto: solo activamos charts duales si el ejercicio
+  // está marcado Y la sesión tiene datos per-side (mismo guard que la
+  // Bitácora). Eso evita pintar una I plana en 0 cuando el usuario marcó
+  // unilateral hace 5 minutos y todo el histórico es bilateral.
+  const hasSplitData = sessions.some(sess =>
+    (sess.sets || []).some(s =>
+      !s.warmup && (s.repsL != null || s.repsR != null
+                    || s.weightL != null || s.weightR != null)));
+  const isUnilateral = !!(ex.unilateralSplit && hasSplitData);
+  chart    = renderProgressChart($('#chartCanvas'), sessions, avgPos, { isUnilateral });
+  chartVol = renderExerciseVolumeChart($('#volumeCanvas'), sessions, { isUnilateral });
 }
