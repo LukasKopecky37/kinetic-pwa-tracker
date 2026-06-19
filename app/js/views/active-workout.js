@@ -334,20 +334,33 @@ function buildPage(item, pageIdx) {
   // En modo SPLIT (manos separadas) las series guardan también `repsL` y
   // `repsR`. `reps` se mantiene como SUMA para que toda la analítica
   // existente (volume, PR, 1RM, etc.) siga funcionando sin tocar nada.
+  // === Estado de cada fila ===
+  // Campos canónicos:
+  //   weight, reps           → la "cara bilateral" del set; analytics clásicas
+  //                            (PR, top weight, volumen) leen de aquí.
+  //   weightL/R, repsL/R     → modo unilateral estricto (is_unilateral). Si
+  //                            el usuario activa "Manos separadas", la UI
+  //                            edita estos cuatro campos directamente; persist
+  //                            sincroniza `weight = max(L,R)` y `reps = L+R`.
+  //   rpe                    → opcional.
   let rows;
   if (todayDone && (todayDone.sets || []).length) {
     rows = todayDone.sets.map(s => ({
       weight: s.weight, reps: s.reps,
+      weightL: s.weightL ?? (s.weight ?? ''),
+      weightR: s.weightR ?? (s.weight ?? ''),
       repsL: s.repsL ?? '', repsR: s.repsR ?? '',
       rpe: s.rpe ?? '', done: true,
     }));
     for (let i = rows.length; i < plannedN; i++) {
       rows.push({ weight: baseW, reps: targetReps,
+                  weightL: baseW, weightR: baseW,
                   repsL: '', repsR: '', rpe: '', done: false });
     }
   } else {
     rows = Array.from({ length: plannedN }, () => ({
       weight: baseW, reps: targetReps,
+      weightL: baseW, weightR: baseW,
       repsL: '', repsR: '', rpe: '', done: false,
     }));
   }
@@ -469,13 +482,16 @@ function buildPage(item, pageIdx) {
   //   - Split:  6 cols → n · KG · L · R · check · del (RPE oculto)
   const headRow = () => {
     if (state.split) {
+      // En unilateral las dos sub-filas (I/D) están auto-etiquetadas
+      // dentro de cada serie → el header solo necesita los nombres de
+      // columna agnósticos: "KG" y "REPS" (sin RPE, sin L/R, sin chk/del).
       return h('div', { class: 'aw-set-head split' },
-        h('span', null, ''),
+        h('span', null, ''),     // #
+        h('span', null, ''),     // tag I/D
         h('span', null, 'KG'),
-        h('span', null, 'L'),
-        h('span', null, 'R'),
-        h('span', null, ''),
-        h('span', null, ''),
+        h('span', null, 'REPS'),
+        h('span', null, ''),     // ✓
+        h('span', null, ''),     // ×
       );
     }
     return h('div', { class: 'aw-set-head' },
@@ -622,22 +638,68 @@ function buildPage(item, pageIdx) {
     const isNext = !row.done && i === firstUndone;
     const curReps = parseInt(row.reps, 10);
     const under = !!(targetReps && curReps > 0 && curReps < targetReps);
+
+    /* ============================================================
+     * UNILATERAL ESTRICTO — sub-filas apiladas I y D.
+     *
+     * Layout (CSS grid 6 cols × 2 rows):
+     *   [#] [I] [KG_I] [REPS_I] [✓] [×]
+     *   [#] [D] [KG_D] [REPS_D] [✓] [×]
+     * Donde [#], [✓] y [×] usan grid-row: 1 / 3 (span vertical).
+     *
+     * Por qué APILADO y no inline:
+     *   - Dos pares de inputs + stepper (KG+REPS × L+R) horizontales
+     *     colapsan irremediablemente en iPhone (320-414px de ancho útil).
+     *   - El usuario lee top-to-bottom igual que en un cuaderno: primero
+     *     el lado izquierdo, luego el derecho, marca ✓ cuando ambos
+     *     están listos.
+     *   - Mantiene la altura de la fila razonable (~96px en split vs
+     *     ~52px en bilateral); 4 series caben en pantalla sin scroll.
+     * ============================================================ */
+    if (state.split) {
+      const els = [
+        h('div', { class: 'aw-set-n', style: 'grid-area:n' }, String(i + 1)),
+        // Sub-fila I
+        h('div', { class: 'aw-side-tag aw-side-i', style: 'grid-area:il' }, 'I'),
+        h('div', { class: 'aw-side-kg',  style: 'grid-area:ikg' },
+          weightField(row, i, 'weightL', 'L')),
+        h('div', { class: 'aw-side-reps', style: 'grid-area:irp' },
+          repsStepper(row, 'repsL', '', i)),
+        // Sub-fila D
+        h('div', { class: 'aw-side-tag aw-side-d', style: 'grid-area:dl' }, 'D'),
+        h('div', { class: 'aw-side-kg',  style: 'grid-area:dkg' },
+          weightField(row, i, 'weightR', 'R')),
+        h('div', { class: 'aw-side-reps', style: 'grid-area:drp' },
+          repsStepper(row, 'repsR', '', i)),
+        // Acciones (span vertical)
+        h('button', {
+          class: 'aw-check', type: 'button', style: 'grid-area:chk',
+          'aria-label': row.done ? 'Reabrir serie' : 'Marcar serie completada',
+          onClick: (e) => toggleDone(i, e.currentTarget),
+        }, row.done ? '✓' : ''),
+        h('button', {
+          class: 'aw-set-del', type: 'button', style: 'grid-area:del',
+          'aria-label': 'Quitar serie',
+          onClick: () => removeRow(i),
+        }, '×'),
+      ];
+      return h('div', {
+        class: 'aw-set split'
+          + (row.done ? ' is-completed' : '')
+          + (isNext ? ' next' : ''),
+        dataset: { i: String(i) },
+      }, ...els);
+    }
+
+    // Modo bilateral clásico — sin cambios.
     const baseEls = [
       h('div', { class: 'aw-set-n' }, String(i + 1)),
       weightField(row, i),
     ];
-    const midEls = state.split
-      ? [
-          // Split mode: dos mini-steppers L | R, RPE oculto.
-          // Cada uno lee su índice del histórico → ghost de "última" per fila.
-          repsStepper(row, 'repsL', 'aw-stepper-mini', i),
-          repsStepper(row, 'repsR', 'aw-stepper-mini', i),
-        ]
-      : [
-          // Normal: un stepper de reps + input de RPE
-          repsStepper(row, 'reps', '', i),
-          field('aw-rpe', 'rpe', row, i, 'decimal'),
-        ];
+    const midEls = [
+      repsStepper(row, 'reps', '', i),
+      field('aw-rpe', 'rpe', row, i, 'decimal'),
+    ];
     const tailEls = [
       h('button', {
         class: 'aw-check', type: 'button',
@@ -652,7 +714,6 @@ function buildPage(item, pageIdx) {
 
     return h('div', {
       class: 'aw-set'
-        + (state.split ? ' split' : '')
         + (row.done ? ' is-completed' : '')
         + (isNext ? ' next' : '')
         + (under ? ' is-under' : ''),
@@ -662,53 +723,72 @@ function buildPage(item, pageIdx) {
 
   /**
    * Campo KG con stepper inline: [−] [input editable] [+]
-   * - Tap −/+ → -/+2.5 kg
+   * - Tap −/+ → -/+`step` kg (default 2.5)
    * - Tap directo en el número → teclado decimal (edición manual)
    * - Smart default: si el input está vacío y tocas +/−, salta al peso
-   *   sugerido (baseW) en vez de a 2.5 desde 0 — coherente con el reps
-   *   stepper que también salta al rango objetivo en su primer toque.
-   * - Min 0 kg (no permite valores negativos). */
-  function weightField(row, i) {
-    const inp = field('aw-w', 'weight', row, i, 'decimal');
+   *   sugerido (baseW) en vez de a 2.5 desde 0.
+   * - Min 0 kg (no permite valores negativos).
+   *
+   * Parámetros:
+   *   key — campo del row al que escribe ('weight' bilateral, 'weightL' /
+   *         'weightR' en modo unilateral estricto).
+   *   side — 'L' | 'R' | null. Cuando se especifica, el smart-default
+   *         lee del lado correcto del histórico (lastSetForRow(i).weightL/R
+   *         con fallback al weight bilateral).
+   */
+  function weightField(row, i, key = 'weight', side = null) {
+    const inp = field('aw-w', key, row, i, 'decimal');
+    const step = +ex.autoIncrementKg > 0 ? +ex.autoIncrementKg : 2.5;
+    const isAssisted = ex.progressionType === 'assisted';
+
+    const sideLastWeight = (rowLast) => {
+      if (!rowLast) return null;
+      if (side === 'L' && rowLast.weightL != null) return rowLast.weightL;
+      if (side === 'R' && rowLast.weightR != null) return rowLast.weightR;
+      return rowLast.weight;
+    };
 
     const bump = (delta) => {
       if (row.done) return;
-      const cur = numify(row.weight);
+      const cur = numify(row[key]);
       let next;
       if (!Number.isFinite(cur) || cur <= 0) {
-        // Primer toque sobre input vacío → carga la "última" per fila si
-        // existe (peso de la serie i del último entrenamiento), si no el
-        // peso sugerido por el algoritmo, si no el delta puro.
         const rowLast = lastSetForRow(i);
-        const lastW = rowLast?.weight;
+        const lastW = sideLastWeight(rowLast);
         const sugg = (lastW != null) ? lastW : numify(baseW);
         next = Number.isFinite(sugg) && sugg > 0 ? sugg : Math.max(0, delta);
       } else {
-        // Redondeo a 0.5 para que un 57.5 + 2.5 quede en 60 limpio.
         next = Math.max(0, Math.round((cur + delta) * 2) / 2);
       }
-      row.weight = next;
+      row[key] = next;
       row.userW = true;
       inp.value = next;
-      if (!last) propagateWeight(i);
+      // Autofill solo aplica al campo bilateral (la propagación entre lados
+      // independientes sería invasiva — el usuario quiere control fino).
+      if (!last && key === 'weight') propagateWeight(i);
       if (row.done) schedulePersist();
     };
+
+    // En modo asistido invertimos las flechas semánticamente: arriba sigue
+    // siendo "más asistencia" (regresión) y abajo "menos asistencia"
+    // (progreso). Para evitar confusión, etiquetamos como "+/−" pero los
+    // títulos del botón se actualizan: + = SUMAR kg de asistencia.
+    const minusLabel = isAssisted ? `${step} kg menos de asistencia` : `Restar ${step} kg`;
+    const plusLabel  = isAssisted ? `${step} kg más de asistencia` : `Sumar ${step} kg`;
 
     return h('div', { class: 'aw-w-stepper' },
       h('button', {
         class: 'aw-w-step', type: 'button',
-        'aria-label': 'Restar 2.5 kg',
-        title: '−2.5 kg',
+        'aria-label': minusLabel, title: `−${step} kg`,
         disabled: row.done || undefined,
-        onClick: () => bump(-2.5),
+        onClick: () => bump(-step),
       }, '−'),
       inp,
       h('button', {
         class: 'aw-w-step', type: 'button',
-        'aria-label': 'Sumar 2.5 kg',
-        title: '+2.5 kg',
+        'aria-label': plusLabel, title: `+${step} kg`,
         disabled: row.done || undefined,
-        onClick: () => bump(+2.5),
+        onClick: () => bump(+step),
       }, '+'),
     );
   }
@@ -726,25 +806,41 @@ function buildPage(item, pageIdx) {
     const row = state.rows[i];
     clearTimeout(persistT);   // cancela un persist debounced en vuelo
     if (!row.done) {
-      const w = numify(row.weight);
-      // En split mode la "validación de reps" es L+R > 0. Un lado a 0 está
-      // permitido (entrenamiento asimétrico real). En modo normal usamos
-      // el campo único reps como siempre.
       let totalReps;
+      let w;
       if (state.split) {
-        const L = intify(row.repsL), R = intify(row.repsR);
-        const Ln = Number.isFinite(L) ? L : 0;
-        const Rn = Number.isFinite(R) ? R : 0;
-        totalReps = Ln + Rn;
-        row.reps = totalReps;   // mantiene reps como suma para analytics
+        // === UNILATERAL ESTRICTO ===
+        // Requerimos peso Y reps válidos en AMBOS lados. Una serie del
+        // unilateral solo está "hecha" cuando se ha entrenado izquierdo
+        // y derecho — si falta uno, el usuario aún no terminó la serie.
+        // (La regla AND de auto-progresión vive en metTargetStrict; aquí
+        // simplemente impedimos cerrar series incompletas.)
+        const wL = numify(row.weightL), wR = numify(row.weightR);
+        const rL = intify(row.repsL),   rR = intify(row.repsR);
+        const okL = Number.isFinite(wL) && wL > 0 && Number.isFinite(rL) && rL > 0;
+        const okR = Number.isFinite(wR) && wR > 0 && Number.isFinite(rR) && rR > 0;
+        if (!okL || !okR) {
+          toast(!okL && !okR
+            ? 'Rellena peso y reps en I y D'
+            : (!okL ? 'Falta peso o reps en el lado I'
+                    : 'Falta peso o reps en el lado D'),
+            'bad');
+          return;
+        }
+        // Sincroniza los campos canónicos para que toda la analítica
+        // bilateral existente (PR clásico, top weight, sessionVolume)
+        // siga funcionando sin tocarse.
+        totalReps   = rL + rR;
+        row.reps    = totalReps;
+        row.weight  = Math.max(wL, wR);
+        w           = row.weight;
       } else {
+        w = numify(row.weight);
         totalReps = intify(row.reps);
-      }
-      if (!(w > 0) || !(totalReps > 0)) {
-        toast(state.split
-          ? 'Pon peso y reps en al menos un lado'
-          : 'Pon peso y reps en la serie', 'bad');
-        return;
+        if (!(w > 0) || !(totalReps > 0)) {
+          toast('Pon peso y reps en la serie', 'bad');
+          return;
+        }
       }
       row.done = true;
       const sess = persist(state);

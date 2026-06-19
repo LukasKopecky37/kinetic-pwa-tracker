@@ -852,11 +852,37 @@
 }
 .ed-item .ed-f input::placeholder{ color:var(--muted); font-weight:500; }
 .ed-item .ed-days{ margin-top:6px; display:flex; gap:4px; flex-wrap:wrap; }
+.ed-item .ed-actions{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  align-self:start;
+}
+.ed-item .ed-settings{
+  background:transparent; border:1px solid var(--line);
+  color:var(--accent-2); cursor:pointer;
+  width:26px; height:26px; border-radius:8px; font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .12s, border-color .12s, color .12s, transform .1s;
+}
+.ed-item .ed-settings:hover{
+  background:var(--accent-bg); border-color:var(--accent); color:var(--accent);
+}
+.ed-item .ed-settings:active{ transform:scale(.92); }
 .ed-item .ed-del{
   background:transparent; border:0; color:var(--bad); cursor:pointer;
   font-size:18px; width:26px; height:26px; border-radius:6px;
 }
 .ed-item .ed-del:hover{ background:var(--bad-bg); }
+/* Tags de overrides guardados en el ejercicio (Asistido / Unilateral / etc).
+   Pequeños, naranja accent, alineados junto a .ed-group. */
+.ed-item .ed-extag{
+  display:inline-flex; align-items:center;
+  font-size:9.5px; font-weight:700; letter-spacing:.3px;
+  color:var(--accent-2);
+  background:var(--accent-bg);
+  border-radius:999px;
+  padding:2px 7px;
+  text-transform:uppercase;
+}
 
 /* ----- Bi-serie (superset) en el editor de Día -----
    Diseño: entre cada par de tarjetas consecutivas vive un CONECTOR

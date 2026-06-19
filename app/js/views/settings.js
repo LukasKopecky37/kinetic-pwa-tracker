@@ -25,6 +25,7 @@ import { openModal, closeModal } from '../services/modal.js';
 import { toast } from '../services/toast.js';
 import { exportJSON, importJSON } from '../services/backup.js';
 import { seedHistoricalData } from '../store/import-history.js';
+import { openExerciseSettings } from './exercise-settings.js';
 import { App } from '../app.js';
 
 /* ============================================================================
@@ -228,6 +229,24 @@ export function openRoutineEditor(routineId) {
            ${itDays.length === 0 ? '<span style="font-size:10px;color:var(--accent-2)">todos</span>' : ''}
          </div>`
       : '';
+    // Etiquetas de los flags del ejercicio (ajustes guardados en biblioteca)
+    // — visibles en el card para que el usuario sepa que ya hay overrides
+    // sin tener que abrir el modal. Pequeñas, naranja accent.
+    const exTags = [];
+    if (ex?.progressionType === 'assisted')   exTags.push('Asistido');
+    if (ex?.progressionType === 'bodyweight') exTags.push('Peso corporal');
+    if (ex?.isUnilateral || ex?.unilateralSplit) exTags.push('Unilateral');
+    const exTagsHTML = exTags.length
+      ? exTags.map(t => `<span class="ed-extag">${escapeH(t)}</span>`).join('')
+      : '';
+
+    // Botón Ajustes ⚙ — abre exercise-settings.js. Disabled si no hay ex
+    // (item con referencia rota → mostrar pero deshabilitado para no
+    // confundir al usuario).
+    const settingsBtn = ex
+      ? `<button class="ed-settings" data-itidx="${idx}" title="Ajustes avanzados del ejercicio" aria-label="Ajustes del ejercicio">⚙</button>`
+      : '';
+
     return `
       <div class="ed-item${ssClass}" data-idx="${idx}">
         <div class="ed-handle">
@@ -238,6 +257,7 @@ export function openRoutineEditor(routineId) {
           <div class="ed-name">
             ${ex ? escapeH(ex.name) : '⚠ borrado'}
             ${ex ? `<span class="ed-group">${escapeH(ex.group)}</span>` : ''}
+            ${exTagsHTML}
             ${ssBadge}
           </div>
           <div class="ed-fields">
@@ -250,7 +270,10 @@ export function openRoutineEditor(routineId) {
           </div>
           ${dayOptions}
         </div>
-        <button class="ed-del" title="Quitar">×</button>
+        <div class="ed-actions">
+          ${settingsBtn}
+          <button class="ed-del" title="Quitar">×</button>
+        </div>
       </div>
     `;
   };
@@ -402,6 +425,19 @@ export function openRoutineEditor(routineId) {
       });
     });
 
+    // Botón Ajustes ⚙ → abre el modal exercise-settings.js. Al guardar
+    // refrescamos el editor para que las exTags (Asistido / Unilateral /
+    // Peso corporal) y los valores por defecto del item se vean reflejados
+    // sin acción adicional del usuario.
+    const settingsBtn = el.querySelector('.ed-settings');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const item = r.items[idx];
+        if (!item || !item.exerciseId) return;
+        openExerciseSettings(item.exerciseId, () => openRoutineEditor(routineId));
+      });
+    }
   });
 
   // Conectores entre tarjetas (bi-serie). Viven FUERA del bucle de ed-items

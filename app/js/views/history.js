@@ -302,48 +302,111 @@ function buildHistRow(ex) {
    Modal de edición de sesión histórica (v6: editor de sets)
    ============================================================================ */
 export function openEditSession(ex, sess) {
-  const isPR = isSessionPR(sess, Store.sessionsByExercise(ex.id, true));
+  const isPR = isSessionPR(sess, Store.sessionsByExercise(ex.id, true), ex);
 
   // Estado local de sets (deep copy)
   const setsState = sess.sets.map(s => ({ ...s }));
 
+  /* === Awareness del tipo de ejercicio (refactor v56) ===
+   * 'unilateral' (is_unilateral): cada serie se desglosa en dos sub-filas
+   *   I y D, cada una con su KG y reps independientes. La columna RPE
+   *   se oculta (igual que en el active-workout) porque casi nadie
+   *   registra RPE per-lado y el RPE total es ambiguo en este modo.
+   * 'assisted': simplemente etiquetamos los kg como "kg asist." para que
+   *   el usuario sepa que está editando contrapeso (más kg = más ayuda).
+   *   La inversión de comparadores ya vive en analytics/prs.js · isPR
+   *   y en analytics/progression.js — el modal solo necesita persistir
+   *   los valores tal cual; el motor los interpreta. */
+  const isUnilateral = !!(ex.isUnilateral || ex.unilateralSplit);
+  const isAssisted   = ex.progressionType === 'assisted';
+  const isBodyweight = ex.progressionType === 'bodyweight';
+
+  const kgLabel = isAssisted   ? 'kg asist.'
+                : isBodyweight ? 'kg (lastre)'
+                : 'kg';
+
   openModal('');
-  const renderSetsList = () => setsState.map((s, i) => `
-    <div class="set-row" data-idx="${i}">
-      <div class="set-num">${i + 1}</div>
-      <div class="set-field">
-        <input class="es-w" type="number" step="0.5" inputmode="decimal"
-               aria-label="Peso de la serie ${i + 1} en kilogramos"
-               value="${s.weight ?? ''}">
+
+  const renderSetsList = () => setsState.map((s, i) => {
+    if (isUnilateral) {
+      return `
+        <div class="set-row split" data-idx="${i}">
+          <div class="set-num" rowspan="2">${i + 1}</div>
+          <div class="set-side-row">
+            <span class="es-side-tag es-side-i">I</span>
+            <input class="set-field es-wL" type="number" step="0.5" inputmode="decimal"
+                   aria-label="Peso izquierdo serie ${i + 1}"
+                   placeholder="kg"
+                   value="${s.weightL ?? s.weight ?? ''}">
+            <input class="set-field es-rL" type="number" inputmode="numeric"
+                   aria-label="Reps izquierdo serie ${i + 1}"
+                   placeholder="reps"
+                   value="${s.repsL ?? ''}">
+          </div>
+          <div class="set-side-row">
+            <span class="es-side-tag es-side-d">D</span>
+            <input class="set-field es-wR" type="number" step="0.5" inputmode="decimal"
+                   aria-label="Peso derecho serie ${i + 1}"
+                   placeholder="kg"
+                   value="${s.weightR ?? s.weight ?? ''}">
+            <input class="set-field es-rR" type="number" inputmode="numeric"
+                   aria-label="Reps derecho serie ${i + 1}"
+                   placeholder="reps"
+                   value="${s.repsR ?? ''}">
+          </div>
+          <button class="set-del" type="button" aria-label="Borrar serie ${i + 1}">×</button>
+        </div>
+      `;
+    }
+    return `
+      <div class="set-row" data-idx="${i}">
+        <div class="set-num">${i + 1}</div>
+        <div class="set-field">
+          <input class="es-w" type="number" step="0.5" inputmode="decimal"
+                 aria-label="Peso de la serie ${i + 1} en kilogramos"
+                 value="${s.weight ?? ''}">
+        </div>
+        <div class="set-field">
+          <input class="es-r" type="number" inputmode="numeric"
+                 aria-label="Repeticiones de la serie ${i + 1}"
+                 value="${s.reps ?? ''}">
+        </div>
+        <div class="set-field set-rpe">
+          <input class="es-rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal"
+                 aria-label="RPE de la serie ${i + 1}"
+                 value="${s.rpe ?? ''}">
+        </div>
+        <button class="set-del" type="button" aria-label="Borrar serie ${i + 1}">×</button>
       </div>
-      <div class="set-field">
-        <input class="es-r" type="number" inputmode="numeric"
-               aria-label="Repeticiones de la serie ${i + 1}"
-               value="${s.reps ?? ''}">
-      </div>
-      <div class="set-field set-rpe">
-        <input class="es-rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal"
-               aria-label="RPE de la serie ${i + 1}"
-               value="${s.rpe ?? ''}">
-      </div>
-      <button class="set-del" type="button" aria-label="Borrar serie ${i + 1}">×</button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+
+  // Distintivo tipográfico arriba para que el usuario sepa "estoy editando
+  // un ejercicio unilateral / asistido / bodyweight" — pequeño, naranja.
+  const modeTags = [
+    isUnilateral && '<span class="es-mode-tag">Unilateral I/D</span>',
+    isAssisted   && '<span class="es-mode-tag es-mode-assisted">Asistido</span>',
+    isBodyweight && '<span class="es-mode-tag es-mode-bw">Peso corporal</span>',
+  ].filter(Boolean).join(' ');
+
+  const headerCols = isUnilateral
+    ? `<span></span><span>I/D</span><span>${kgLabel}</span><span>reps</span><span></span>`
+    : `<span></span><span>${kgLabel}</span><span>reps</span><span>rpe</span><span></span>`;
 
   $('#modal').innerHTML = `
     <div class="modal-head">
       <div>
         <h3>${escapeH(ex.name)} ${isPR ? '<span class="pr-flag">PR</span>' : ''}</h3>
-        <div style="font-size:12px;color:var(--muted)">${escapeH(ex.group)} · ${sess.date}</div>
+        <div style="font-size:12px;color:var(--muted)">${escapeH(ex.group)} · ${sess.date} ${modeTags}</div>
       </div>
       <button class="x" id="esClose">×</button>
     </div>
     <div class="modal-body">
       <h4>Series</h4>
-      <div class="sets-list-head" aria-hidden="true">
-        <span></span><span>kg</span><span>reps</span><span>rpe</span><span></span>
+      <div class="sets-list-head${isUnilateral ? ' split' : ''}" aria-hidden="true">
+        ${headerCols}
       </div>
-      <div class="sets-list" id="esSets">${renderSetsList()}</div>
+      <div class="sets-list${isUnilateral ? ' split' : ''}" id="esSets">${renderSetsList()}</div>
       <button class="btn-add-set" type="button" id="esAdd">+ Añadir serie</button>
 
       <div class="form-grid" style="margin-top:14px">
@@ -369,22 +432,50 @@ export function openEditSession(ex, sess) {
   `;
   $('#modalBg').classList.add('show');
 
+  const numOrNull = (v) => v === '' || v == null ? null
+                          : (isNaN(parseFloat(v)) ? null : parseFloat(v));
+  const intOrNull = (v) => v === '' || v == null ? null
+                          : (isNaN(parseInt(v, 10)) ? null : parseInt(v, 10));
+
   const wire = () => {
     $$('#esSets .set-row').forEach(row => {
       const idx = parseInt(row.dataset.idx, 10);
-      row.querySelector('.es-w').addEventListener('input', e => {
-        setsState[idx].weight = e.target.value === '' ? null : parseFloat(e.target.value);
-        renderSummary();
-      });
-      row.querySelector('.es-r').addEventListener('input', e => {
-        setsState[idx].reps = e.target.value === '' ? null : parseInt(e.target.value, 10);
-        renderSummary();
-      });
-      row.querySelector('.es-rpe').addEventListener('input', e => {
-        const v = parseFloat(e.target.value);
-        if (isNaN(v)) delete setsState[idx].rpe;
-        else setsState[idx].rpe = v;
-      });
+
+      if (isUnilateral) {
+        // Sub-fila I
+        row.querySelector('.es-wL').addEventListener('input', e => {
+          setsState[idx].weightL = numOrNull(e.target.value);
+          syncDerived(setsState[idx]); renderSummary();
+        });
+        row.querySelector('.es-rL').addEventListener('input', e => {
+          setsState[idx].repsL = intOrNull(e.target.value);
+          syncDerived(setsState[idx]); renderSummary();
+        });
+        // Sub-fila D
+        row.querySelector('.es-wR').addEventListener('input', e => {
+          setsState[idx].weightR = numOrNull(e.target.value);
+          syncDerived(setsState[idx]); renderSummary();
+        });
+        row.querySelector('.es-rR').addEventListener('input', e => {
+          setsState[idx].repsR = intOrNull(e.target.value);
+          syncDerived(setsState[idx]); renderSummary();
+        });
+      } else {
+        row.querySelector('.es-w').addEventListener('input', e => {
+          setsState[idx].weight = numOrNull(e.target.value);
+          renderSummary();
+        });
+        row.querySelector('.es-r').addEventListener('input', e => {
+          setsState[idx].reps = intOrNull(e.target.value);
+          renderSummary();
+        });
+        row.querySelector('.es-rpe').addEventListener('input', e => {
+          const v = parseFloat(e.target.value);
+          if (isNaN(v)) delete setsState[idx].rpe;
+          else setsState[idx].rpe = v;
+        });
+      }
+
       row.querySelector('.set-del').addEventListener('click', () => {
         setsState.splice(idx, 1);
         if (setsState.length === 0) setsState.push({ weight: null, reps: null });
@@ -394,6 +485,22 @@ export function openEditSession(ex, sess) {
       });
     });
   };
+
+  /* Mantiene `weight` y `reps` sincronizados con los valores per-side cuando
+   * el ejercicio es unilateral. La analítica clásica (sessionVolume,
+   * topWeight, isPR bilateral) lee de los campos planos → con este sync el
+   * resto del sistema sigue funcionando aunque la fuente de verdad sean los
+   * per-side. */
+  function syncDerived(s) {
+    const wL = +s.weightL, wR = +s.weightR;
+    const rL = +s.repsL, rR = +s.repsR;
+    const hasW = Number.isFinite(wL) || Number.isFinite(wR);
+    const hasR = Number.isFinite(rL) || Number.isFinite(rR);
+    if (hasW) s.weight = Math.max(Number.isFinite(wL) ? wL : 0,
+                                  Number.isFinite(wR) ? wR : 0);
+    if (hasR) s.reps   = (Number.isFinite(rL) ? rL : 0)
+                       + (Number.isFinite(rR) ? rR : 0);
+  }
 
   const renderSummary = () => {
     const valid = setsState.filter(s => s.weight > 0 && s.reps > 0);
@@ -417,19 +524,48 @@ export function openEditSession(ex, sess) {
   });
   $('#esAdd').addEventListener('click', () => {
     const prev = setsState[setsState.length - 1];
-    setsState.push({ weight: prev?.weight ?? null, reps: null });
+    const newSet = isUnilateral
+      ? { weightL: prev?.weightL ?? prev?.weight ?? null,
+          weightR: prev?.weightR ?? prev?.weight ?? null,
+          repsL: null, repsR: null,
+          weight: prev?.weight ?? null, reps: null }
+      : { weight: prev?.weight ?? null, reps: null };
+    setsState.push(newSet);
     $('#esSets').innerHTML = renderSetsList();
     wire();
     renderSummary();
   });
   $('#esSave').addEventListener('click', () => {
     const cleanSets = setsState
-      .map(s => ({
-        weight: typeof s.weight === 'number' ? s.weight : parseFloat(s.weight),
-        reps:   typeof s.reps   === 'number' ? s.reps   : parseInt(s.reps, 10),
-        ...(s.rpe != null ? { rpe: s.rpe } : {}),
-        ...(s.warmup ? { warmup: true } : {}),
-      }))
+      .map(s => {
+        const out = {
+          weight: typeof s.weight === 'number' ? s.weight : parseFloat(s.weight),
+          reps:   typeof s.reps   === 'number' ? s.reps   : parseInt(s.reps, 10),
+          ...(s.rpe != null ? { rpe: s.rpe } : {}),
+          ...(s.warmup ? { warmup: true } : {}),
+        };
+        // Persist per-side fields cuando el ejercicio es unilateral. Los
+        // campos planos (weight, reps) los rellenamos como derivados de
+        // los lados para mantener compat con toda la analítica clásica.
+        if (isUnilateral) {
+          const wL = +s.weightL, wR = +s.weightR;
+          const rL = +s.repsL,   rR = +s.repsR;
+          if (Number.isFinite(wL)) out.weightL = wL;
+          if (Number.isFinite(wR)) out.weightR = wR;
+          if (Number.isFinite(rL)) out.repsL = rL;
+          if (Number.isFinite(rR)) out.repsR = rR;
+          // Re-derivamos por si el último syncDerived quedó stale:
+          if (Number.isFinite(wL) || Number.isFinite(wR)) {
+            out.weight = Math.max(Number.isFinite(wL) ? wL : 0,
+                                  Number.isFinite(wR) ? wR : 0);
+          }
+          if (Number.isFinite(rL) || Number.isFinite(rR)) {
+            out.reps = (Number.isFinite(rL) ? rL : 0)
+                     + (Number.isFinite(rR) ? rR : 0);
+          }
+        }
+        return out;
+      })
       .filter(s => !isNaN(s.weight) && !isNaN(s.reps) && s.weight > 0 && s.reps > 0);
 
     if (cleanSets.length === 0) {

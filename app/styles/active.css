@@ -227,11 +227,44 @@ body.aw-open .rest-panel { display: none !important; }
   grid-template-columns: 28px minmax(0,2fr) minmax(0,2fr) minmax(0,1.2fr) 50px 22px;
   gap: 8px; align-items: center;
 }
-.aw-set-head.split,
-.aw-set.split {
-  grid-template-columns: 28px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 50px 22px;
+/* === Modo UNILATERAL ESTRICTO (sub-filas I/D apiladas) ===
+ * El header sigue siendo de 1 fila pero con 6 columnas alineadas con la
+ * grid del set: [#] [tag] [KG] [REPS] [✓] [×].
+ * El set en sí usa 2 filas auto con grid-template-areas para mapear los
+ * elementos: número y acciones span ambas filas; cada lado ocupa su row. */
+.aw-set-head.split {
+  grid-template-columns: 28px 22px minmax(0,1fr) minmax(0,1fr) 50px 22px;
   gap: 6px;
 }
+.aw-set.split {
+  grid-template-columns: 28px 22px minmax(0,1fr) minmax(0,1fr) 50px 22px;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "n il ikg irp chk del"
+    "n dl dkg drp chk del";
+  gap: 6px 6px;
+  padding: 8px 10px;
+  row-gap: 6px;
+}
+.aw-set.split .aw-set-n { align-self: center; }
+.aw-set.split .aw-check { align-self: center; }
+.aw-set.split .aw-set-del { align-self: center; }
+.aw-side-tag{
+  /* La etiqueta I/D se pinta como una "perlita" cuadrada compacta junto
+     a la sub-fila, en el mismo lenguaje visual que el número de serie. */
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 30px;
+  font-size: 11px; font-weight: 800;
+  letter-spacing: .5px;
+  color: var(--muted);
+  background: var(--neutral-bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.aw-side-i { color: #60a5fa; border-color: rgba(96,165,250,.35); background: rgba(96,165,250,.06); }
+.aw-side-d { color: var(--accent-2); border-color: rgba(255,164,92,.35); background: rgba(255,164,92,.06); }
+.aw-set.split.is-completed .aw-side-tag { color: var(--good); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.06); }
+.aw-side-kg, .aw-side-reps { min-width: 0; }
 .aw-set-head { padding: 0 10px 2px; }
 .aw-set-head span {
   font-size: 10px; color: var(--muted); text-align: center;
