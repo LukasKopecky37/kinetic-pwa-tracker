@@ -159,8 +159,15 @@ export function openWorkoutSummary(workoutId) {
     for (const sess of linkedSessions) {
       const item = routine.items.find(it => it.exerciseId === sess.exerciseId);
       if (!item) continue;
-      if (!metTargetStrict(sess, item.repRange, item.sets)) continue;
       const ex = Store.exerciseById(sess.exerciseId);
+      // Pasamos `ex` para que el evaluador honre progressionType (assisted
+      // invierte la dirección) y la regla AND estricta de unilateral.
+      const range = ex?.targetRepRange
+        && Number.isFinite(ex.targetRepRange.min)
+        && Number.isFinite(ex.targetRepRange.max)
+        ? `${ex.targetRepRange.min}-${ex.targetRepRange.max}`
+        : item.repRange;
+      if (!metTargetStrict(sess, range, item.sets, ex)) continue;
       if (ex) bumps.push({ name: ex.name, kg: bumpKgFor(ex) });
     }
   }

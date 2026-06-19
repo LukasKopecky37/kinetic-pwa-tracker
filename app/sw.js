@@ -14,7 +14,7 @@
  * descargar la nueva shell. Al activar, las caches antiguas se borran.
  */
 
-const CACHE_VERSION = 'rutina-v54';
+const CACHE_VERSION = 'rutina-v55';
 
 // Lista del shell (rutas relativas a la raíz del servidor que sirve la app).
 const SHELL = [
@@ -90,6 +90,7 @@ const SHELL = [
   './js/views/workout.js',
   './js/views/active-workout.js',
   './js/views/body.js',
+  './js/views/exercise-settings.js',
   './js/charts/body-composition.js',
 ];
 
@@ -110,6 +111,25 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)));
     await self.clients.claim();
+  })());
+});
+
+/* ------------------------ NOTIFICATIONCLICK ---------------------- *
+ * Click en la notificación "¡Descanso terminado!" → traer al frente
+ * la pestaña / ventana del PWA si existe; si no, abrir una nueva.
+ * Best-effort: en iOS PWA standalone esto suele activar la pantalla
+ * inicial de la app instalada.
+ * ----------------------------------------------------------------- */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({
+      type: 'window', includeUncontrolled: true,
+    });
+    for (const c of all) {
+      if ('focus' in c) return c.focus();
+    }
+    if (self.clients.openWindow) return self.clients.openWindow('./');
   })());
 });
 

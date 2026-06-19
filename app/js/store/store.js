@@ -618,7 +618,11 @@ export const Store = {
   },
 
   isPR(s) {
-    return isPR(s, this.sessionsByExercise(s.exerciseId, true));
+    return isPR(
+      s,
+      this.sessionsByExercise(s.exerciseId, true),
+      this.exerciseById(s.exerciseId),
+    );
   },
 
   activeMusclesForDay(routineId, date) {

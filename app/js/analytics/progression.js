@@ -1,14 +1,21 @@
 /**
  * Progresión — sugerencias y comprobación estricta de objetivos.
  *
- * v6 + Fase J: regla anti-"bump silencioso". El peso solo sube si:
- *   1) hay ≥ targetSets series de trabajo (al mismo peso, sin warm-ups), y
- *   2) TODAS esas series llegan al top del rango (12-15 → todas con 15+).
- * Si no se cumple → se mantiene el peso. Ya NO se baja automáticamente
- * (eso es decisión del usuario, no del algoritmo).
+ * v6 + Fase J + refactor v55: arquitectura limpia para tres tipos de
+ * ejercicio. La regla "el peso solo sube si TODAS las series tope-rango
+ * pegaron al top" sigue siendo el corazón; lo que cambia es la dirección
+ * y los criterios según `Exercise.progressionType`:
  *
- * El mismo helper `metTargetStrict()` lo usa el modal post-workout para
- * felicitar y listar los ejercicios que ganan +kg la próxima semana.
+ *   'standard'   → más kg = progreso  (default: pesas libres, máquinas)
+ *   'assisted'   → menos kg = progreso (dominadas asistidas, fondos
+ *                   asistidos: bajar el contrapeso es mejorar)
+ *   'bodyweight' → no se toca el peso; el progreso se mide en reps
+ *                   (dominadas estrictas, flexiones).
+ *
+ * Para ejercicios `isUnilateral` la comprobación de "cumplió el rango"
+ * exige AND ESTRICTO por lado: ambos brazos/piernas deben llegar al top
+ * de forma independiente. Sumar reps L+R y compararlo con el max es la
+ * fuente del bug "PR falso por suma" que ahora se elimina.
  */
 
 import { topSet } from './prs.js';
@@ -25,111 +32,195 @@ export function averagePosition(sessions, n = 5) {
 }
 
 /**
- * Parsea '8-12' a { min, max }. Defaults razonables.
+ * Parsea '8-12' a { min, max }. Acepta tanto el string clásico del item
+ * de rutina como un objeto { min, max } directo (cuando el ejercicio
+ * tiene su propio targetRepRange custom).
  * @returns {{min:number, max:number}}
  */
 export function parseRepRange(repRange) {
-  const m = (repRange || '8-12').match(/(\d+)\s*-\s*(\d+)/);
+  if (repRange && typeof repRange === 'object'
+      && Number.isFinite(repRange.min) && Number.isFinite(repRange.max)) {
+    return { min: repRange.min, max: repRange.max };
+  }
+  const m = String(repRange || '8-12').match(/(\d+)\s*-\s*(\d+)/);
   return m
     ? { min: parseInt(m[1], 10), max: parseInt(m[2], 10) }
     : { min: 8, max: 12 };
 }
 
-/** Series de TRABAJO de una sesión: sin warm-ups, al peso máximo usado. */
-export function workingSets(session) {
+/**
+ * Devuelve el tipo de progresión efectivo del ejercicio.
+ * Default 'standard' para todo lo que no tenga el campo (compat hacia atrás).
+ * @returns {'standard'|'assisted'|'bodyweight'}
+ */
+export function progressionTypeOf(exercise) {
+  const t = exercise?.progressionType;
+  if (t === 'assisted' || t === 'bodyweight') return t;
+  return 'standard';
+}
+
+/**
+ * "Mejor" peso del set según el tipo de progresión.
+ *   - standard:   max(weight)
+ *   - assisted:   min(weight)   ← invertido
+ *   - bodyweight: 0 (el peso no es la métrica)
+ *
+ * Se usa en `workingSets` para detectar el "peso de trabajo" del que se
+ * promedian las series tope-rango.
+ * @returns {(a:number, b:number) => number}
+ */
+function bestKgReducer(type) {
+  if (type === 'assisted') return (a, b) => Math.min(a, b);
+  return (a, b) => Math.max(a, b);
+}
+
+/** Series de TRABAJO de una sesión: sin warm-ups, al peso de referencia. */
+export function workingSets(session, exercise) {
   const valid = (session?.sets || []).filter(
-    s => !s.warmup && s.weight > 0 && s.reps > 0,
+    s => !s.warmup && s.weight >= 0 && s.reps > 0,
   );
   if (!valid.length) return [];
-  const top = Math.max(...valid.map(s => s.weight));
-  return valid.filter(s => s.weight === top);
+  const type = progressionTypeOf(exercise);
+  if (type === 'bodyweight') {
+    // En bodyweight la "carga" siempre es la misma (el cuerpo); todas las
+    // series cuentan como working sets sin importar su `weight`.
+    return valid;
+  }
+  const cmp = bestKgReducer(type);
+  const workW = valid.map(s => s.weight).reduce(cmp);
+  return valid.filter(s => s.weight === workW);
 }
 
 /**
  * ¿La sesión cumplió ESTRICTAMENTE el objetivo del plan?
- * Requiere ≥ targetSets series al mismo peso de trabajo, todas con reps
- * que alcancen o superen el top del rango (12-15 → ≥15).
  *
- * Si no hay `targetSets` explícito, exige un mínimo razonable de 3 series.
+ * Reglas:
+ *   1. ≥ `targetSets` series de trabajo (mismo peso de referencia).
+ *   2. Por serie:
+ *      - is_unilateral === true → repsL >= max AND repsR >= max  (AND estricto)
+ *      - is_unilateral === false → reps >= max
+ *
+ * Por qué AND estricto en unilateral:
+ *   Antes se comparaba el total sumado (`reps = repsL + repsR`) contra
+ *   `max`. Eso producía falsos positivos: 10+10 = 20 superaba el target
+ *   de 12, así que el algoritmo subía el peso aunque la persona hubiera
+ *   fallado el rango en AMBOS lados. Con AND ahora la app solo sube
+ *   cuando EL LADO MÁS DÉBIL alcanza el top — la definición sana de
+ *   progresión unilateral.
+ *
+ * @param {object} session
+ * @param {string|{min,max}} repRange
+ * @param {number} targetSets
+ * @param {object} [exercise]
  * @returns {boolean}
  */
-export function metTargetStrict(session, repRange, targetSets) {
-  const work = workingSets(session);
+export function metTargetStrict(session, repRange, targetSets, exercise) {
+  const work = workingSets(session, exercise);
   if (!work.length) return false;
   const need = Math.max(1, targetSets || 3);
   if (work.length < need) return false;
   const { max } = parseRepRange(repRange);
+  const isUnilateral = !!exercise?.isUnilateral || !!exercise?.unilateralSplit;
+
+  if (isUnilateral) {
+    // Cada serie debe tener repsL >= max AND repsR >= max. Si una serie
+    // no tiene datos per-side (legacy bilateral) la consideramos NO
+    // cumplida — más seguro que asumir el doble del bilateral.
+    return work.every(s => {
+      const L = +s.repsL;
+      const R = +s.repsR;
+      return Number.isFinite(L) && Number.isFinite(R) && L >= max && R >= max;
+    });
+  }
+
   return work.every(s => s.reps >= max);
 }
 
 /**
- * Incremento estricto: +2.5 kg SIEMPRE.
+ * Incremento de carga por ejercicio.
  *
- * Antes devolvía +5 kg para compuestos / Piernas / Glúteos / Espalda y
- * +2.5 kg para aislamientos. QA reveló que los saltos de 5 kg eran
- * irreales en el gym — un atleta serio en double-progression usa el
- * escalón mínimo de la barra olímpica (un disco de 1.25 kg por lado =
- * +2.5 kg netos). Saltar 5 kg cumple objetivos UN día y descarrila las
- * 2-3 sesiones siguientes.
+ * Prioridad de lectura:
+ *   1. `exercise.autoIncrementKg` (override per-ejercicio, ajuste en Editar)
+ *   2. 2.5 kg (default global, mínimo discos olímpicos)
  *
- * El parámetro `_exercise` se conserva por compat de API — todas las
- * llamadas existentes (suggestNextWeight, override ▲/▼) siguen
- * pasándolo, ahora simplemente se ignora. Si el usuario quiere
- * incrementos por ejercicio individualmente, el override ▲ ya cubre
- * 'súbeme 2.5 esta vez'.
+ * Para `progressionType === 'bodyweight'` devuelve 0: el progreso no se
+ * mide en kg sino en reps.
  *
- * @param {{group?:string, compound?:boolean}|null} [_exercise]
+ * @param {object} [exercise]
  * @returns {number}
  */
-export function bumpKgFor(_exercise) {
+export function bumpKgFor(exercise) {
+  if (progressionTypeOf(exercise) === 'bodyweight') return 0;
+  const custom = +(exercise?.autoIncrementKg);
+  if (Number.isFinite(custom) && custom > 0) return custom;
   return 2.5;
 }
 
 /**
+ * Aplica el bump al peso de trabajo, RESPETANDO la dirección del tipo
+ * de progresión:
+ *   - standard:   workW + bump
+ *   - assisted:   workW - bump (¡menos asistencia es progreso!)
+ *   - bodyweight: workW (no aplica)
+ *
+ * Redondeo a 0.5 kg → 57.5 + 2.5 = 60 limpio.
+ * Para assisted, el mínimo es 0 (sin asistencia = bodyweight puro).
+ */
+function applyBump(workW, bump, type) {
+  if (type === 'bodyweight') return workW;
+  const next = type === 'assisted' ? workW - bump : workW + bump;
+  const rounded = Math.round(next * 2) / 2;
+  return Math.max(0, rounded);
+}
+
+/**
+ * Aplica una regresión deliberada ('down' override).
+ *   - standard:   workW - bump (mínimo 0)
+ *   - assisted:   workW + bump (subir asistencia = retroceder)
+ *   - bodyweight: workW
+ */
+function applyRegression(workW, bump, type) {
+  if (type === 'bodyweight') return workW;
+  const next = type === 'assisted' ? workW + bump : workW - bump;
+  const rounded = Math.round(next * 2) / 2;
+  return Math.max(0, rounded);
+}
+
+/**
  * Recomienda peso para la próxima sesión.
- *   - éxito estricto (ver `metTargetStrict`) → peso de trabajo + `bumpKgFor`
+ *
+ *   - éxito estricto (ver `metTargetStrict`) → `applyBump(workW, …)`
  *   - cualquier otro caso                    → MANTENER peso de trabajo
  *
- * Importante: NO baja automáticamente al fallar — antes lo hacía y producía
- * sugerencias erróneas tras una sola sesión floja. Si el usuario quiere
- * bajar, lo edita él.
+ * Honra los overrides manuales del usuario en `last.nextOverride`:
+ *   'up'   → fuerza bump (en la dirección "buena" del tipo)
+ *   'down' → fuerza regresión (dirección "mala" del tipo)
+ *   'flat' → congela el peso (=)
  *
  * @param {Array<object>} sessions
- * @param {string} repRange
+ * @param {string|{min,max}} repRange
  * @param {number} [targetSets]
- * @param {{group?:string, compound?:boolean}} [exercise]
+ * @param {object} [exercise]
  * @returns {number|null}
  */
 export function suggestNextWeight(sessions, repRange, targetSets, exercise) {
   if (!sessions.length) return null;
   const last = sessions[sessions.length - 1];
-  const work = workingSets(last);
+  const work = workingSets(last, exercise);
   if (!work.length) return topSet(last)?.weight ?? null;
 
   const workW = work[0].weight;
   const bump  = bumpKgFor(exercise);
+  const type  = progressionTypeOf(exercise);
 
-  /* === Override manual del usuario (Human-in-the-loop) ===
-     Si en la última sesión se marcó nextOverride='up' / 'down' / 'flat',
-     ese flag puentea la lógica automática de double-progression. Es la
-     palanca consciente: "yo decido qué peso quiero la próxima vez".
+  if (last.nextOverride === 'up')   return applyBump(workW, bump, type);
+  if (last.nextOverride === 'down') return applyRegression(workW, bump, type);
+  if (last.nextOverride === 'flat') return workW;
 
-     'flat' (=) → CONGELA el peso. Aunque cumplas el rango estricto y el
-     algoritmo quisiera subir +2.5, te quedas exactamente en workW. Útil
-     cuando quieres consolidar una carga antes del próximo escalón. */
-  if (last.nextOverride === 'up') {
-    return Math.round((workW + bump) * 2) / 2;
+  // Lógica automática estándar: solo "sube" (en el sentido bueno para el
+  // tipo) si cumplió rango estricto y AND unilateral si aplica.
+  if (metTargetStrict(last, repRange, targetSets, exercise)) {
+    return applyBump(workW, bump, type);
   }
-  if (last.nextOverride === 'down') {
-    return Math.max(0, Math.round((workW - bump) * 2) / 2);
-  }
-  if (last.nextOverride === 'flat') {
-    return workW;
-  }
-
-  // Lógica automática estándar: solo sube si cumplió rango estricto.
-  if (metTargetStrict(last, repRange, targetSets)) {
-    return Math.round((workW + bump) * 2) / 2;
-  }
-  return workW; // mantener, NO bajar (sería decisión del usuario)
+  return workW;
 }

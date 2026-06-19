@@ -148,13 +148,59 @@ export function sessionTotalVolume(session) {
  * último PR histórico filtrando con `bestSetVolume`. Ambos contratos se
  * mantienen coherentes.
  *
+ * v55: para ejercicios `assisted` la métrica se invierte. Un PR de
+ * dominadas asistidas es BAJAR el contrapeso (o subir reps al mismo
+ * contrapeso menor). El "mejor" set por volumen se interpreta como:
+ *   - standard:   max(peso × reps)   ← más es mejor
+ *   - assisted:   max((1/peso) × reps) cuando peso > 0;
+ *                 si peso==0 (sin asistencia) el ejercicio entra en
+ *                 "bodyweight" implícito → el ranking pasa a comparar
+ *                 reps puras (más reps = mejor). Mismo signo, distinta
+ *                 escala — se mantiene la regla "estrictamente mayor"
+ *                 sin tocar el resto del flujo.
+ *   - bodyweight: max(reps)
+ *
  * @param {{id:number|string, date:string, sets:Array}} session
  * @param {Array<object>} exerciseSessions
+ * @param {object} [exercise]  opcional; si trae `progressionType` se usa
+ *                             para invertir la métrica.
  * @returns {boolean}
  */
-export function isPR(session, exerciseSessions) {
+function _prMetric(session, exercise) {
+  const type = exercise?.progressionType;
+  if (type === 'bodyweight') {
+    // max reps de un solo work-set
+    let top = 0;
+    for (const s of (session?.sets || [])) {
+      if (s.warmup) continue;
+      const r = +s.reps || 0;
+      if (r > top) top = r;
+    }
+    return top;
+  }
+  if (type === 'assisted') {
+    // "menos peso × más reps" → usamos (1 + 1/(weight+1)) * reps como
+    // score monotónico. Trabajando sin asistencia (weight=0) maximiza
+    // el factor; con asistencia alta el factor cae. Empata bonito con
+    // el caso reps puras y mantiene la propiedad "estrictamente >".
+    let top = 0;
+    for (const s of (session?.sets || [])) {
+      if (s.warmup) continue;
+      const r = +s.reps || 0;
+      if (!r) continue;
+      const w = +s.weight || 0;
+      const score = (1 + 1 / (w + 1)) * r;
+      if (score > top) top = score;
+    }
+    return top;
+  }
+  // standard
+  return bestSetVolume(session);
+}
+
+export function isPR(session, exerciseSessions, exercise) {
   if (!session?.sets?.length) return false;
-  const bv = bestSetVolume(session);
+  const bv = _prMetric(session, exercise);
   if (bv <= 0) return false;
 
   // "Previa o coincidente": fecha < ó (misma fecha pero id léxicamente
@@ -168,7 +214,7 @@ export function isPR(session, exerciseSessions) {
     const earlier =
       x.date < sdate || (x.date === sdate && String(x.id) < sid);
     if (!earlier) continue;
-    if (bestSetVolume(x) >= bv) return false;
+    if (_prMetric(x, exercise) >= bv) return false;
   }
   return true;
 }

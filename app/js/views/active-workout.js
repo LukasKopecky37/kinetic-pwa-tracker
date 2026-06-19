@@ -38,6 +38,7 @@ import { openModal, closeModal } from '../services/modal.js';
 import { vibrate } from '../services/haptics.js';
 import { fireConfetti } from '../services/confetti.js';
 import { confirmFinishWorkout } from './workout.js';
+import { openExerciseSettings } from './exercise-settings.js';
 import { App } from '../app.js';
 
 /* ---- estado de módulo (un solo player activo a la vez) ---- */
@@ -289,9 +290,17 @@ function buildPage(item, pageIdx) {
 
   const last       = Store.lastSession(ex.id, date);
   const lastTop    = last ? topSet(last) : null;
-  const suggestedW = Store.suggestWeight(ex.id, item.repRange, item.sets);
+  // Rango efectivo: prioriza el `targetRepRange` per-ejercicio sobre el del
+  // item de la rutina. Se lo pasamos a suggestNextWeight para que la
+  // auto-progresión use el rango "duro" del ejercicio, no el genérico del día.
+  const _exRange = (ex.targetRepRange
+                    && Number.isFinite(ex.targetRepRange.min)
+                    && Number.isFinite(ex.targetRepRange.max))
+    ? `${ex.targetRepRange.min}-${ex.targetRepRange.max}`
+    : (item.repRange || '8-12');
+  const suggestedW = Store.suggestWeight(ex.id, _exRange, item.sets);
   const baseW      = suggestedW || (lastTop ? lastTop.weight : '');
-  const targetReps = parseTargetReps(item.repRange)
+  const targetReps = parseTargetReps(_exRange)
     || (lastTop ? lastTop.reps : '');
 
   /* === "Última" dinámica por fila ===
@@ -309,7 +318,15 @@ function buildPage(item, pageIdx) {
     if (!lastWorkSets.length) return null;
     return lastWorkSets[i] || lastWorkSets[lastWorkSets.length - 1];
   }
-  const restSec    = item.rest || Store.getDefaultRest();
+  // Prioridad de configuración:
+  //   1. Ajustes per-ejercicio (Exercise Settings — refactor v55)
+  //   2. Config del item de la rutina
+  //   3. Default global
+  // Esto deja al usuario afinar parámetros por ejercicio (rest largo en
+  // sentadilla, corto en bíceps) sin tocar la plantilla de la rutina.
+  const restSec    = (+ex.defaultRest > 0)
+    ? +ex.defaultRest
+    : (item.rest || Store.getDefaultRest());
   const todayDone  = Store.sessionsByDate(date).find(s => s.exerciseId === ex.id);
   const plannedN   = item.sets || 3;
 
@@ -390,14 +407,27 @@ function buildPage(item, pageIdx) {
    * que cambie el foco — toggleDone (✓/reabrir), removeRow (×), addBtn
    * (+ añadir serie). Resto del flujo sin cambios. */
   const lastValueEl = last ? h('b', null, '') : null;
+  // Botón "Ajustes" — abre el modal de Exercise Settings (rest, rango,
+  // incremento, tipo de progresión, unilateral). Al guardar refresca el
+  // player completo via rebuildPages para reflejar nuevos parámetros sin
+  // perder las series ya marcadas (persisten en Store).
+  const settingsBtn = h('button', {
+    class: 'aw-ex-settings',
+    type: 'button',
+    'aria-label': 'Ajustes avanzados del ejercicio',
+    title: 'Ajustes (descanso, rango, incremento, tipo)',
+    onClick: () => openExerciseSettings(ex.id, () => rebuildPages(ex.id)),
+  }, '⚙');
+
   const head = h('div', { class: 'aw-ex-head' },
     h('div', { class: 'aw-ex-titles' },
       h('div', { class: 'aw-ex-name-row' },
         h('div', { class: 'aw-ex-name' }, ex.name),
         tipsBtn,
+        settingsBtn,
       ),
       h('div', { class: 'aw-ex-meta' },
-        `${escapeH(ex.group)} · ${item.sets}×${item.repRange} · descanso ${fmtMMSS(restSec)}`),
+        `${escapeH(ex.group)} · ${item.sets}×${_exRange} · descanso ${fmtMMSS(restSec)}`),
     ),
     h('div', { class: 'aw-ex-last' },
       last
