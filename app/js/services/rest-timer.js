@@ -32,16 +32,38 @@ import { beepEndOfRest } from './audio.js';
 import { vibrate } from './haptics.js';
 import { toast } from './toast.js';
 
-/* Estado del permiso (lo pedimos lazy en el primer start con notificaciones
- * habilitadas, no al cargar la app — Apple HIG y mejor UX). */
-let _notifPermissionAsked = false;
+/* ============================================================================
+ * NOTIFICACIONES LOCALES — ciclo de vida robusto (fix bug 4)
+ *
+ * Problema reportado: las notificaciones de "descanso terminado" dejaron de
+ * salir. Causas que blindamos aquí:
+ *   - Permiso bloqueado en estado 'default' por un guard que NUNCA reintentaba
+ *     (la antigua _notifPermissionAsked impedía volver a pedir).
+ *   - El disparo dependía de un SW que podía no estar listo.
+ *   - Sin limpieza de callbacks viejos entre series (listeners zombi).
+ *
+ * Lo que SÍ se puede en una PWA iOS 16.4+ instalada: mostrar una Notification
+ * vía el Service Worker en cuanto el timer llega a 0 (finish). Lo que NO se
+ * puede sin backend Web Push: entregar la notificación mientras el JS está
+ * suspendido (pantalla bloqueada largo rato). En primer plano iOS suele
+ * suprimir el banner de PWA → por eso mantenemos toast+beep+vibración como
+ * feedback garantizado en foreground.
+ * ========================================================================== */
 
+/** ¿El navegador soporta notificaciones? */
+function notifSupported() {
+  return typeof window !== 'undefined' && 'Notification' in window;
+}
+
+/**
+ * Pide permiso de notificación. DEBE invocarse desde un gesto del usuario
+ * (un click) para que iOS muestre el prompt. Reintenta mientras el estado
+ * sea 'default' (sin el guard roto anterior). Devuelve el permiso final.
+ */
 async function ensureNotificationPermission() {
-  if (!('Notification' in window)) return 'unsupported';
+  if (!notifSupported()) return 'unsupported';
   if (Notification.permission === 'granted') return 'granted';
   if (Notification.permission === 'denied') return 'denied';
-  if (_notifPermissionAsked) return Notification.permission;
-  _notifPermissionAsked = true;
   try {
     return await Notification.requestPermission();
   } catch {
@@ -49,26 +71,35 @@ async function ensureNotificationPermission() {
   }
 }
 
+/**
+ * Muestra la notificación de fin de descanso. Reevalúa permiso en caliente
+ * y prefiere el SW (banner persistente, puede salir con la app en segundo
+ * plano); si no hay SW, cae a la Notification directa.
+ */
 async function fireRestEndedNotification(exName) {
-  if (!('Notification' in window)) return;
+  if (!notifSupported()) return;
   if (Notification.permission !== 'granted') return;
   const payload = {
-    body: '¡A por tu siguiente serie!' + (exName ? ' · ' + exName : ''),
+    body: 'Es hora de tu siguiente serie. ¡A por ello!'
+          + (exName ? '\n' + exName : ''),
     icon: './icon.svg',
     badge: './icon.svg',
-    tag: 'rest-ended',                  // reemplaza notificaciones anteriores
+    tag: 'rest-ended',                  // reemplaza la anterior en la bandeja
     renotify: true,
     requireInteraction: false,
-    silent: false,
+    silent: false,                      // ← sonido del SO (equivalente a .sound)
+    vibrate: [200, 100, 200],           // patrón en plataformas que lo soporten
     data: { kind: 'rest-ended', when: Date.now() },
   };
   try {
-    // Preferimos el SW (puede mostrar notificaciones aunque la pestaña
-    // esté en segundo plano); si no hay SW activo, usamos la API directa.
     if ('serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.ready.catch(() => null);
-      if (reg) { reg.showNotification('¡Descanso terminado!', payload); return; }
+      if (reg && reg.showNotification) {
+        await reg.showNotification('¡Descanso terminado!', payload);
+        return;
+      }
     }
+    // Fallback directo (foreground en plataformas que lo permitan).
     new Notification('¡Descanso terminado!', payload);
   } catch (err) {
     console.warn('[restTimer] Notification fallback failed:', err);
@@ -83,8 +114,11 @@ export const RestTimer = {
   remaining: 0,
   intervalId: null,
   exName: '',
-  endAt: 0,        // timestamp objetivo (ms) — fuente de verdad
-  _finishTO: null, // timeout del auto-ocultar (evita "timer fantasma")
+  endAt: 0,         // timestamp objetivo (ms) — fuente de verdad
+  _finishTO: null,  // timeout del auto-ocultar (evita "timer fantasma")
+  _onComplete: null, // callback one-shot: se dispara al COMPLETAR/SALTAR el
+                     // descanso (no al matar el timer por fin de entreno).
+                     // Lo usa el flujo de bi-serie para volver al ejercicio A.
 
   /* Suscriptores externos (p.ej. el timer grande del player). Cada uno
    * recibe el estado en cada tick / start / stop / finish. El panel fijo
@@ -102,23 +136,39 @@ export const RestTimer = {
   },
   notify() { this.subscribers.forEach(fn => fn(this.snapshot())); },
 
-  start(seconds, exName) {
+  /**
+   * Arranca un descanso.
+   * @param {number} seconds
+   * @param {string} exName
+   * @param {Function} [onComplete] callback one-shot que se dispara cuando el
+   *        descanso TERMINA (timer a 0) o el usuario pulsa "Saltar". NO se
+   *        dispara si el timer se mata por fin/cancelación de entrenamiento.
+   */
+  start(seconds, exName, onComplete) {
     this.total = seconds;
     this.endAt = Date.now() + seconds * 1000;
     this.remaining = seconds;
     this.exName = exName || 'Descanso';
+    // LIMPIEZA de listeners viejos ANTES de armar el nuevo descanso
+    // (requisito bug 4: no acumular callbacks/timeouts zombi entre series).
+    this._onComplete = typeof onComplete === 'function' ? onComplete : null;
     if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
     this.show();
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = setInterval(() => this.tick(), 1000);
     this.render();
 
-    // Notification: pide permiso lazy en el primer start. Si concedido,
-    // sabemos por el flanco running→idle del finish() que toca lanzar.
-    // No PROGRAMAMOS una notificación con setTimeout aparte porque iOS
-    // PWA puede suspender el setInterval y la salida correcta sigue
-    // siendo el evento finish() que ya tenemos.
+    // Permiso de notificación: lazy en el primer start (gesto de usuario).
     ensureNotificationPermission().catch(() => {});
+  },
+
+  /** Dispara (una sola vez) el callback de finalización y lo limpia. */
+  _fireComplete() {
+    const cb = this._onComplete;
+    this._onComplete = null;
+    if (typeof cb === 'function') {
+      try { cb(); } catch (e) { console.warn('[restTimer] onComplete error', e); }
+    }
   },
 
   /* Recalcula SIEMPRE desde el reloj real: si iOS pausó/throttleó el
@@ -144,16 +194,45 @@ export const RestTimer = {
     // o ha cambiado a otra app. Best-effort: si no hay permiso o el SO
     // suspendió la pestaña antes de tiempo, se cae graceful.
     fireRestEndedNotification(this.exName);
+    // Bi-serie: vuelta automática al ejercicio A (se dispara una vez).
+    this._fireComplete();
     if (this._finishTO) clearTimeout(this._finishTO);
     this._finishTO = setTimeout(() => this.stop(), 1500);
   },
 
+  /**
+   * "Saltar": el usuario corta el descanso a propósito. Termina el timer YA
+   * y dispara el onComplete (igual que un finish natural) → en una bi-serie
+   * eso vuelve al ejercicio A. NO suena ni notifica (fue una acción manual).
+   */
+  skip() {
+    if (this.intervalId) clearInterval(this.intervalId);
+    this.intervalId = null;
+    if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
+    this.remaining = 0;
+    $('#restPanel').classList.remove('show');
+    this.notify();
+    this._fireComplete();
+  },
+
+  /**
+   * Kill SILENCIOSO del timer — usado al terminar/cancelar el entrenamiento.
+   * A diferencia de skip(), NO dispara onComplete (no queremos un salto de
+   * bi-serie cuando el entreno se está cerrando) y DESCARTA el callback
+   * pendiente para que no se ejecute más tarde sobre un overlay cerrado.
+   */
   stop() {
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = null;
     if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
+    this._onComplete = null;
     $('#restPanel').classList.remove('show');
     this.notify();
+  },
+
+  /** Pide permiso de notificaciones (envuelve el helper para uso externo). */
+  requestNotifications() {
+    return ensureNotificationPermission();
   },
 
   add(seconds) {
@@ -180,7 +259,10 @@ export const RestTimer = {
   bind() {
     $('#rpPlus').addEventListener('click',  () => this.add(15));
     $('#rpMinus').addEventListener('click', () => this.add(-15));
-    $('#rpStop').addEventListener('click',  () => this.stop());
+    // "Saltar" del panel fijo = skip() → corta el descanso y dispara el
+    // onComplete (vuelta de bi-serie). Antes llamaba a stop() (silencioso),
+    // por eso el retorno automático no ocurría al saltar manualmente.
+    $('#rpStop').addEventListener('click',  () => this.skip());
     // Al desbloquear el móvil / volver a la app, recalcula al instante.
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && this.intervalId) this.tick();

@@ -53,15 +53,11 @@ let onResize = null;
 // terminar/cancelar o al abrir un workout distinto.
 let extraItems = [];
 let lastWorkoutId = null;
-/* === Bi-serie (superset) — estado del flujo intercalado ===
- * Cuando el usuario completa el set N del SEGUNDO ejercicio de una bi-serie,
- * pedimos al RestTimer que arranque y dejamos guardada aquí la pageIdx del
- * PRIMER ejercicio para volver automáticamente al terminar el descanso.
- * También guardamos `wasRunningRest` en el restRenderer para detectar el
- * flanco running→idle (= "el rest acaba de terminar") sin tocar la API
- * del RestTimer global. */
-let pendingSupersetReturn = null;
-let restWasRunning = false;
+/* === Bi-serie (superset) — flujo intercalado ===
+ * La vuelta automática al ejercicio A tras el descanso del ejercicio B ya
+ * NO usa flags de módulo + detección de flancos (frágil). Ahora pasamos un
+ * callback one-shot `onComplete` a RestTimer.start() que se dispara exacta-
+ * mente al terminar o saltar el descanso. Ver toggleDone(). */
 
 /** Items del workout activo = los del día + los transitorios (sin duplicar). */
 function activeItems(routine) {
@@ -470,7 +466,29 @@ function buildPage(item, pageIdx) {
       ? state.rows.length - 1   // todas hechas → reflejo de la última fila
       : firstUndone;
     const ref = lastSetForRow(focusIdx);
-    lastValueEl.textContent = ref ? fmtTopSet(ref) : '—';
+    if (!ref) {
+      lastValueEl.classList.remove('split');
+      lastValueEl.textContent = '—';
+      return;
+    }
+    /* UNILATERAL (fix bug 1): si el ejercicio está en modo split Y la serie
+     * histórica de referencia trae datos per-lado, mostramos el desglose
+     * I / D en dos líneas compactas en vez del valor plano unificado. Si la
+     * serie histórica es bilateral (sin repsL/R), caemos al fmtTopSet clásico. */
+    const hasSide = ref.repsL != null || ref.repsR != null;
+    if (state.split && hasSide) {
+      const wL = ref.weightL != null ? ref.weightL : ref.weight;
+      const wR = ref.weightR != null ? ref.weightR : ref.weight;
+      const rL = ref.repsL != null ? ref.repsL : '–';
+      const rR = ref.repsR != null ? ref.repsR : '–';
+      lastValueEl.classList.add('split');
+      lastValueEl.innerHTML =
+        `<span class="aw-last-side i"><i>I</i> ${wL}×${rL}</span>` +
+        `<span class="aw-last-side d"><i>D</i> ${wR}×${rR}</span>`;
+    } else {
+      lastValueEl.classList.remove('split');
+      lastValueEl.textContent = fmtTopSet(ref);
+    }
   }
   updateLastChip();
 
@@ -852,8 +870,37 @@ function buildPage(item, pageIdx) {
       // el usuario queda atascado con "Completa las series" disabled
       // aunque ya no quede nada pendiente en toda la rutina.
       updateChrome();
-      const isPR = sess && Store.isPR(sess);
-      if (isPR && !state.prCelebrated) {
+
+      /* ============================================================
+       * PR + CONFETI (fix bug 2)
+       *
+       * Antes: gate = Store.isPR(sess), que evalúa el VOLUMEN de la mejor
+       * serie de la sesión vs el histórico. Funciona, pero el usuario
+       * reportó disparos inconsistentes. La causa: comparar a nivel de
+       * SESIÓN (max sobre todos los sets) en vez del set RECIÉN marcado.
+       *
+       * Ahora, para ejercicios estándar, comparamos EXPLÍCITAMENTE el
+       * volumen de la serie que se acaba de cerrar contra el mejor volumen
+       * de serie histórico de este ejercicio (excluyendo la sesión en
+       * curso): current_weight × current_reps > historical_best_set_volume.
+       * Estricto → dispara confeti el 100% de las veces que se supera.
+       *
+       * Para 'assisted'/'bodyweight' delegamos en Store.isPR, que invierte
+       * la métrica correctamente (menos peso / más reps = progreso).
+       *
+       * Mapeo unilateral v52: w = max(weightL, weightR), totalReps =
+       * repsL + repsR (sincronizados arriba en la rama split) → el volumen
+       * de serie usa los MISMOS campos canónicos que bestSetVolume lee del
+       * histórico. Comparación manzana-con-manzana garantizada. */
+      let isPRHit;
+      if (ex.progressionType === 'assisted' || ex.progressionType === 'bodyweight') {
+        isPRHit = !!(sess && Store.isPR(sess));
+      } else {
+        const checkedSetVol = (numify(w) || 0) * (totalReps || 0);
+        const histBest = Store.bestHistoricalSetVolume(ex.id, sess && sess.id);
+        isPRHit = checkedSetVol > 0 && checkedSetVol > histBest;
+      }
+      if (isPRHit && !state.prCelebrated) {
         state.prCelebrated = true;
         toast(`¡Nuevo PR en ${ex.name}!`, 'pr');
         vibrate([30, 50, 30, 50, 90]);
@@ -880,6 +927,7 @@ function buildPage(item, pageIdx) {
       const myPage = pages[pageIdx + 1];
       const ss = myPage && myPage.superset;
       let suppressRest = false;
+      let onRestDone = null;
       if (ss) {
         const partner = pages[ss.partnerPageIdx];
         const partnerRow = partner && partner.state && partner.state.rows[i];
@@ -889,15 +937,24 @@ function buildPage(item, pageIdx) {
           // Micro-delay para que el estado del botón se anime antes del swipe.
           setTimeout(() => goTo(ss.partnerPageIdx), 120);
         } else if (ss.pairIndex === 1) {
-          // Soy B → tras el rest, volver a A para su siguiente set.
-          const aNextRow = partner && partner.state && partner.state.rows[i + 1];
-          if (aNextRow && !aNextRow.done) {
-            pendingSupersetReturn = ss.partnerPageIdx;
+          // Soy B → al TERMINAR o SALTAR el descanso, volver a A si A todavía
+          // tiene alguna serie pendiente. Callback one-shot robusto: lo
+          // dispara RestTimer en finish()/skip(), sin flags de módulo.
+          const aHasPending = partner && partner.state
+            && partner.state.rows.some(r => !r.done);
+          if (aHasPending) {
+            const returnPageIdx = ss.partnerPageIdx;
+            onRestDone = () => {
+              // Solo navegar si el overlay sigue abierto (no minimizado/cerrado).
+              const overlay = document.getElementById('activeWorkout');
+              if (!overlay || !overlay.classList.contains('show')) return;
+              goTo(returnPageIdx);
+            };
           }
         }
       }
       if (!suppressRest) {
-        RestTimer.start(restSec, ex.name);
+        RestTimer.start(restSec, ex.name, onRestDone);
       }
     } else {
       row.done = false;
@@ -1490,7 +1547,7 @@ function buildRest() {
         h('button', { type: 'button', onClick: () => RestTimer.add(-15) }, '−15'),
         h('button', { type: 'button', onClick: () => RestTimer.add(15) }, '+15'),
         h('button', { class: 'skip', type: 'button',
-          onClick: () => RestTimer.stop() }, 'Saltar'),
+          onClick: () => RestTimer.skip() }, 'Saltar'),
       ),
     ),
   );
@@ -1501,25 +1558,11 @@ function renderRest(s) {
   if (!host) return;
   if (!s.running || s.remaining <= 0) {
     host.hidden = true;
-    /* AUTO-RETURN bi-serie:
-     * Si veníamos de un descanso CORRIENDO y ahora está idle (= acaba de
-     * terminar O lo saltó el usuario), y hay un `pendingSupersetReturn`
-     * pendiente del flujo intercalado, saltar a A. Se hace AQUÍ porque
-     * `RestTimer` es global y no queríamos meterle un callback acoplado al
-     * player; con la suscripción ya activa basta detectar el flanco.
-     * Si el usuario saltó manualmente "Saltar", también vuelve — es el
-     * comportamiento esperado: el descanso terminó, sigues con A. */
-    if (restWasRunning && pendingSupersetReturn != null) {
-      const target = pendingSupersetReturn;
-      pendingSupersetReturn = null;
-      // pequeño delay para que la anim del panel desaparezca limpia
-      setTimeout(() => goTo(target), 200);
-    }
-    restWasRunning = false;
+    // La vuelta de bi-serie ya NO se gestiona aquí (era frágil con flancos);
+    // ahora la dispara el callback onComplete de RestTimer. Ver toggleDone().
     return;
   }
   host.hidden = false;
-  restWasRunning = true;     // estamos en running → arma el flanco para el próximo idle
   $('#awRestTime').textContent = fmtMMSS(s.remaining);
   $('#awRestName').textContent = s.exName || 'Descanso';
   const ring = host.querySelector('.aw-rest-ring');
@@ -1703,8 +1746,4 @@ export function closeActiveWorkout() {
   if (onResize) { window.removeEventListener('resize', onResize); onResize = null; }
   pages = [];
   idx = 0;
-  // Reset del flujo intercalado de bi-serie: si al cerrar/minimizar había
-  // un retorno programado a A, su pageIdx queda inválido. Lo borramos.
-  pendingSupersetReturn = null;
-  restWasRunning = false;
 }

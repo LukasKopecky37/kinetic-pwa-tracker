@@ -32,7 +32,7 @@ import { estimate1RM, bestEstimated1RM }         from '../analytics/one-rm.js';
 import { suggestNextWeight, averagePosition }    from '../analytics/progression.js';
 import { isStalled, findStalledExercises }       from '../analytics/stagnation.js';
 import { weeklySetsByGroup, adherenceMatrix }    from '../analytics/volume.js';
-import { isPR }                                  from '../analytics/prs.js';
+import { isPR, bestSetVolume }                   from '../analytics/prs.js';
 import { activeMuscles }                         from '../analytics/muscles.js';
 
 // Contador monótono para ids de sesión: evita la colisión de
@@ -623,6 +623,26 @@ export const Store = {
       this.sessionsByExercise(s.exerciseId, true),
       this.exerciseById(s.exerciseId),
     );
+  },
+
+  /**
+   * Mejor volumen de SERIE histórico de un ejercicio: max(peso × reps) de
+   * una sola serie, sobre todas las sesiones del ejercicio EXCEPTO la que
+   * se pasa en `excludeSessionId` (la sesión en curso).
+   *
+   * Usado por el gate de confeti del Active Workout (fix bug 2): compara el
+   * volumen de la serie recién marcada contra este histórico de forma
+   * estricta. Devuelve 0 si no hay histórico previo (→ la primera serie
+   * con datos siempre es PR).
+   */
+  bestHistoricalSetVolume(exId, excludeSessionId) {
+    let best = 0;
+    for (const s of this.sessionsByExercise(exId, true)) {
+      if (excludeSessionId != null && s.id === excludeSessionId) continue;
+      const v = bestSetVolume(s);
+      if (v > best) best = v;
+    }
+    return best;
   },
 
   activeMusclesForDay(routineId, date) {

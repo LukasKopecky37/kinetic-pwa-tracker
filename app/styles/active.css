@@ -207,6 +207,22 @@ body.aw-open .rest-panel { display: none !important; }
   text-transform: uppercase; letter-spacing: .8px; margin-bottom: 2px;
 }
 .aw-ex-last b { color: var(--text); font-weight: 700; font-size: 13px; }
+/* Variante UNILATERAL del chip ÚLTIMA: dos líneas I / D apiladas (fix bug 1).
+   Compacto, alineado a la derecha, con la inicial del lado coloreada (I cyan,
+   D naranja) para casar con las pastillas de las sub-filas del set. */
+.aw-ex-last b.split {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  font-size: 12px; line-height: 1.25;
+}
+.aw-ex-last .aw-last-side {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.aw-ex-last .aw-last-side i {
+  font-style: normal; font-weight: 800; margin-right: 3px;
+}
+.aw-ex-last .aw-last-side.i i { color: #60a5fa; }
+.aw-ex-last .aw-last-side.d i { color: var(--accent-2); }
 
 /* ----- Series (Módulo 2: fila limpia + check circular) ----- */
 .aw-sets { display: flex; flex-direction: column; gap: 8px; }
