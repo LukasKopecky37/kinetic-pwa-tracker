@@ -298,48 +298,55 @@ body.aw-open .rest-panel { display: none !important; }
 /* Serie completada: inputs bloqueados temporalmente */
 .aw-set.is-completed .aw-in { opacity: .6; pointer-events: none; }
 
-/* Stepper de reps: [- N +] sin teclado nativo. Encaja en la columna 2fr.
-   IMPORTANTE: usa la MISMA altura que la pill de KG (.aw-w-stepper) para
-   que las dos columnas queden visualmente idénticas. align-items:center
-   (no stretch) → los botones mantienen su altura interna sin deformarse
-   verticalmente. min-height matchea el ancho de la pill de KG (input 16px
-   con padding 12px arriba/abajo + bordes ≈ 44px). */
+/* ===========================================================================
+   Stepper de reps: [− N +] sin teclado nativo.
+   ---------------------------------------------------------------------------
+   REWRITE v57 — FLEXBOX robusto (adiós al grid que desbordaba).
+
+   Bug raíz (IMG_5882/5883): el modelo anterior era
+     grid-template-columns: 36px 1fr 36px
+   Un track `1fr` es en realidad `minmax(auto, 1fr)`: se NIEGA a encogerse
+   por debajo del ancho intrínseco de su contenido. En columnas REPS
+   estrechas, el track central crecía para meter el número y empujaba el
+   grid completo MÁS ANCHO que su contenedor → la celda derecha (el botón
+   "+") quedaba parcialmente fuera, bajo el borde. Por eso el "+" se veía
+   pegado/recortado contra el border, y con 2 dígitos (10, 12) sería peor.
+
+   Solución definitiva (lo que pidió el usuario):
+     - display:flex; justify-content:space-between; align-items:stretch
+     - padding horizontal 6px → respiración garantizada desde el border
+     - botones: tamaño FIJO cuadrado (flex:0 0 30px), glyph centrado con
+       flex; NUNCA crecen ni se pegan al borde absoluto.
+     - valor central: flex:1 1 0 + min-width:0 → SÍ puede encogerse, así
+       que jamás empuja a los botones fuera del contenedor.
+   align-items:stretch mantiene los botones a altura completa (tap target
+   cómodo en el gym) sin deformar el glyph (está centrado por flex). */
 .aw-stepper {
-  display: grid; grid-template-columns: 36px 1fr 36px;
-  gap: 4px; align-items: center;
+  display: flex; align-items: stretch; justify-content: space-between;
+  width: 100%; box-sizing: border-box;
+  gap: 0;
   background: var(--neutral-bg); border: 1px solid transparent;
-  border-radius: 8px; padding: 2px;
+  border-radius: 8px;
+  padding: 2px 5px;                              /* 5px lateral = respiración del "+" */
   min-height: 44px;
-  box-sizing: border-box;
 }
 .aw-set.next .aw-stepper { border-color: var(--accent); }
 .aw-stepper .aw-step {
-  /* FIX glyph clipping (IMG_5522): a 20px + weight 800 el glyph del "+" en
-     iOS Safari mide ~13px y, con padding:0 y la celda en 34px, la punta
-     derecha del trazo horizontal toca el borde y se ve cortada (sobre todo
-     en pantallas con escalado denso). Solución:
-       1. Celda 34→36px → 1px extra a cada lado del glyph.
-       2. weight 800→700 → trazo menos grueso, glyph 1-2px más estrecho.
-       3. font-size 20→18 → glyph un punto más bajo (sigue clarísimo).
-       4. min-width explícito → blinda el tap target si en el futuro algo
-          cambia la columna padre.
-       5. padding 0 → 0 2px → micro-respiración interna garantizada.
-     El componente se ve idéntico a primera vista pero el "+" ya no muerde. */
+  flex: 0 0 26px;                                /* cuadrado fijo, no crece ni encoge */
+  min-width: 26px; min-height: 26px;
   background: transparent; border: 0; color: var(--accent-2);
   font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer;
   border-radius: 6px;
-  padding: 0 2px;
-  min-width: 32px;
+  padding: 0;
   display: flex; align-items: center; justify-content: center;
-  height: 100%;                                 /* fill stepper para tap target cómodo */
   font-variant-numeric: tabular-nums;
   transition: background .12s, transform .1s;
 }
 .aw-stepper .aw-step:active { transform: scale(.9); background: rgba(255,122,47,.18); }
 .aw-stepper .aw-step:disabled { opacity: .4; cursor: not-allowed; }
 .aw-stepper .aw-step-val {
+  flex: 1 1 0; min-width: 0;                     /* shrinkable → nunca desborda */
   display: flex; align-items: center; justify-content: center;
-  height: 100%;                                  /* fill vertical igual que los botones */
   font-size: 17px; font-weight: 700; color: var(--text);
   font-variant-numeric: tabular-nums; user-select: none;
   transition: color .15s, opacity .15s;
@@ -359,17 +366,17 @@ body.aw-open .rest-panel { display: none !important; }
    steppers (L y R) quepan en el ancho asignado a la columna REPS.
    Buttons 18px en vez de 34px → cabe 18+18+gap = ~40px y deja ~25px
    para el valor numérico en una columna 1fr de ~67px. */
+/* Variante MINI (modo split, dos steppers L|R en la columna REPS). Hereda
+   el modelo flex del padre; solo encoge los botones para que dos quepan en
+   el ancho asignado. padding lateral 4px (algo menos que el grande). */
 .aw-stepper.aw-stepper-mini {
-  grid-template-columns: 20px 1fr 20px;       /* 18→20: 1px extra cada lado del "+" */
-  gap: 2px;
-  padding: 1px;
+  padding: 1px 4px;
+  gap: 1px;
 }
 .aw-stepper.aw-stepper-mini .aw-step {
-  /* min-width:32px del padre rompería la grid de 20px → reset explícito.
-     padding 0 para no comerse aún más espacio en una celda tan estrecha. */
-  min-width: 0;
-  padding: 0;
-  font-size: 13px;
+  flex: 0 0 24px;
+  min-width: 24px; min-height: 24px;
+  font-size: 14px;
   font-weight: 700;
 }
 .aw-stepper.aw-stepper-mini .aw-step-val { font-size: 14px; }
@@ -440,15 +447,21 @@ body.aw-open .rest-panel { display: none !important; }
    Visual: un solo bordeado exterior, buttons borderless por dentro → se ve
    como UN componente, no como tres elementos sueltos.
    ============================================================================ */
+/* REWRITE v57 — mismo modelo robusto que .aw-stepper para simetría visual
+   exacta entre KG y REPS. Clave: QUITAMOS `overflow:hidden` (era lo que
+   recortaba el glyph "+" contra el borde) y añadimos padding lateral 6px
+   para que los botones respiren. Las esquinas redondeadas las da el
+   border-radius del wrapper; el input tiene fondo transparente, así que
+   no necesita el overflow:hidden para nada. */
 .aw-w-stepper {
-  display: flex; align-items: stretch;
-  width: 100%; min-width: 0;
+  display: flex; align-items: stretch; justify-content: space-between;
+  width: 100%; min-width: 0; box-sizing: border-box;
+  gap: 0;
   background: var(--neutral-bg);
   border: 1px solid transparent;
   border-radius: 8px;
-  overflow: hidden;
+  padding: 0 5px;                                /* 5px lateral = respiración del "+" */
   min-height: 44px;                              /* MATCH .aw-stepper (REPS) */
-  box-sizing: border-box;
   transition: border-color .15s, background .15s;
 }
 .aw-w-stepper:focus-within {
@@ -457,12 +470,14 @@ body.aw-open .rest-panel { display: none !important; }
 }
 .aw-set.next .aw-w-stepper { border-color: var(--accent); }
 
-/* El input pierde su borde/bg propio porque ahora vive DENTRO del wrapper.
-   Padding lateral 0 para dejar todo el ancho disponible al texto numérico. */
+/* El input ocupa el centro flexible. min-width:0 → puede encogerse sin
+   empujar los botones fuera. text-align center para casar con el stepper
+   de reps. */
 .aw-w-stepper .aw-in {
-  flex: 1; min-width: 0;
-  padding: 12px 0;
+  flex: 1 1 0; min-width: 0;
+  padding: 12px 4px;
   font-size: 16px;
+  text-align: center;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -473,30 +488,21 @@ body.aw-open .rest-panel { display: none !important; }
 }
 
 .aw-w-step {
-  /* FIX glyph clipping (IMG_5522):
-     Antes 22px @ font-weight 800 + font-size 15: el wrapper padre tiene
-     overflow:hidden y el "+" extra-bold se pegaba al borde derecho, dando
-     la sensación de estar cortado.
-     Cambios:
-       - 22→26px de ancho (4px extra de respiración horizontal).
-       - font-weight 800→700 → glyph 1-2px más estrecho.
-       - font-size 15→14 → un punto más bajo, sigue legible en el gym.
-       - padding 0→0 2px → caja interna respira aunque el glyph se mueva
-         1px por subpixel rendering de iOS Safari.
-     El input central pierde 8px en total (4 por lado) → del orden de
-     pasar de ~28 a ~20px de ancho real para los dígitos; con pesos
-     ≤999.5 sigue cabiendo (4 dígitos + decimal en tabular-nums). */
-  width: 26px; min-width: 26px;
+  /* Cuadrado fijo idéntico al .aw-step de REPS (26px) → KG y REPS son
+     visualmente gemelos. Glyph centrado por flex; nunca se pega al borde
+     porque el wrapper tiene padding lateral 5px. */
+  flex: 0 0 26px;
+  min-width: 26px; min-height: 26px;
   background: transparent;
   border: 0;
   color: var(--accent-2);
-  font-size: 14px; font-weight: 700;
+  font-size: 18px; font-weight: 700;
   cursor: pointer;
   font-family: inherit;
-  display: inline-flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
   line-height: 1;
-  padding: 0 2px;
+  padding: 0;
+  border-radius: 6px;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: background .12s, color .12s, transform .1s;
