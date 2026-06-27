@@ -240,7 +240,9 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-set-head,
 .aw-set {
   display: grid;
-  grid-template-columns: 28px minmax(0,2fr) minmax(0,2fr) minmax(0,1.2fr) 50px 22px;
+  /* KG algo más ancho que REPS (2.3 vs 2) para alojar pesos de 3 dígitos
+     (135, 137, 200 kg) sin recortar; RPE se estrecha (1fr) por ser opcional. */
+  grid-template-columns: 28px minmax(0,2.3fr) minmax(0,2fr) minmax(0,1fr) 50px 22px;
   gap: 8px; align-items: center;
 }
 /* === Modo UNILATERAL ESTRICTO (sub-filas I/D apiladas) ===
@@ -397,6 +399,42 @@ body.aw-open .rest-panel { display: none !important; }
 }
 .aw-stepper.aw-stepper-mini .aw-step-val { font-size: 14px; }
 
+/* === Strip "Peso corporal" — prominente, acento naranja === */
+.aw-bw-strip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  margin: 4px 0 8px;
+  background: rgba(255,107,0,.07);
+  border: 1px solid rgba(255,107,0,.30);
+  border-radius: 12px;
+}
+.aw-bw-main { flex: 1; min-width: 0; }
+.aw-bw-title {
+  font-size: 14px; font-weight: 800; color: var(--accent);
+  letter-spacing: .2px;
+}
+.aw-bw-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* Pastilla "PC" que reemplaza el stepper de KG en modo peso corporal.
+   Misma altura que .aw-w-stepper para no romper la alineación de la fila. */
+.aw-bw-cell {
+  width: 100%; min-width: 0;
+  min-height: 44px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  gap: 4px;
+  background: var(--neutral-bg);
+  border: 1px dashed rgba(255,107,0,.45);
+  border-radius: 8px;
+  color: var(--accent-2);
+  font-size: 13px; font-weight: 800; letter-spacing: .5px;
+  cursor: pointer; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .12s, border-color .12s, transform .1s;
+}
+.aw-bw-cell:hover { background: rgba(255,107,0,.08); border-color: var(--accent); }
+.aw-bw-cell:active { transform: scale(.96); }
+.aw-set.is-completed .aw-bw-cell { opacity: .6; pointer-events: none; }
+
 /* === Toggle "Manos separadas" — strip + iOS-style switch === */
 .aw-split-toggle {
   display: flex; align-items: center; gap: 10px;
@@ -491,24 +529,30 @@ body.aw-open .rest-panel { display: none !important; }
    de reps. */
 .aw-w-stepper .aw-in {
   flex: 1 1 0; min-width: 0;
-  padding: 12px 4px;
+  padding: 12px 2px;
   font-size: 16px;
   text-align: center;
   background: transparent;
   border: 0;
   border-radius: 0;
+  transition: font-size .1s;
 }
+/* Escalado dinámico por nº de dígitos (fix overflow IMG_6101/6102): pesos de
+   3 dígitos (137) bajan un punto y aprietan el tracking; 4+ (1000, 137.5)
+   bajan más. El JS (fitWeightFont) togglea estas clases al teclear/±. */
+.aw-w-stepper .aw-in.dig3 { font-size: 15px; letter-spacing: -.3px; }
+.aw-w-stepper .aw-in.dig4 { font-size: 13px; letter-spacing: -.5px; }
 .aw-w-stepper .aw-in:focus {
   background: transparent;
   border-color: transparent;
 }
 
 .aw-w-step {
-  /* Cuadrado fijo idéntico al .aw-step de REPS (26px) → KG y REPS son
-     visualmente gemelos. Glyph centrado por flex; nunca se pega al borde
-     porque el wrapper tiene padding lateral 5px. */
-  flex: 0 0 26px;
-  min-width: 26px; min-height: 26px;
+  /* Cuadrado fijo 24px (un pelín más estrecho que los 26 de REPS) para
+     liberar ~4px al input central y alojar pesos de 3 dígitos. Glyph
+     centrado por flex; nunca se pega al borde (padding lateral del wrapper). */
+  flex: 0 0 24px;
+  min-width: 24px; min-height: 24px;
   background: transparent;
   border: 0;
   color: var(--accent-2);
@@ -850,6 +894,10 @@ body.aw-open .rest-panel { display: none !important; }
   text-transform: uppercase; letter-spacing: .8px; margin: 12px 2px 8px;
 }
 .aw-sheet-cap:first-child { margin-top: 0; }
+.aw-sheet-note {
+  font-size: 11.5px; color: var(--muted); line-height: 1.4;
+  margin: 0 2px 10px;
+}
 .aw-sheet-jump { display: flex; flex-direction: column; gap: 6px; }
 .aw-sheet-list { display: flex; flex-direction: column; gap: 6px; }
 .aw-sheet-row {
@@ -985,7 +1033,11 @@ body.aw-open .rest-panel { display: none !important; }
  * ========================================================================== */
 .exset-body{
   display: flex; flex-direction: column; gap: 22px;
-  padding: 4px 2px 2px;
+  padding: 4px 2px 16px;
+  /* min-height:0 → como flex-item del .modal (columna), permite encoger por
+     debajo de su contenido y que overflow-y:auto (heredado de .modal-body)
+     active el scroll vertical. Sin esto el body crecía y el fondo se cortaba. */
+  min-height: 0;
 }
 .exset-exname{
   color: var(--accent-2);

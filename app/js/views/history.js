@@ -136,7 +136,10 @@ function buildBitacoraRow(sess, routine) {
     class: 'bit-row' + (isUnilateral ? ' split' : ''),
     onClick: () => ex && openEditSession(ex, sess),
   },
-    h('div', { class: 'bit-name' }, name),
+    h('div', { class: 'bit-name' },
+      name,
+      sess.temporary ? h('span', { class: 'bit-temp-tag' }, 'temporal') : null,
+    ),
     h('div', { class: 'bit-target' }, target),
     isUnilateral
       ? h('div', { class: 'bit-vals bit-vals-split' },

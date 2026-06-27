@@ -37,6 +37,7 @@ export const App = {
     this.bindBack();
     bindModalDismiss();
     RestTimer.bind();
+    this.bindRestPanelReturn();
     this.showHome();            // SIEMPRE empezar en home
     this.refreshAll();
     $('#todayPill').textContent = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
@@ -58,6 +59,22 @@ export const App = {
    * ciclo app ↔ active-workout). */
   showActiveWorkout() {
     import('./views/active-workout.js').then(m => m.openActiveWorkout());
+  },
+
+  /** Tap en CUALQUIER parte del panel de descanso flotante (excepto sus
+   * botones +15/−15/×) → reabre el entrenamiento activo. Antes solo el chip
+   * "entrenando" del header lo reabría; el usuario tocaba intuitivamente el
+   * contador de descanso y no pasaba nada. */
+  bindRestPanelReturn() {
+    const panel = document.getElementById('restPanel');
+    if (!panel) return;
+    panel.addEventListener('click', (e) => {
+      if (e.target.closest('.rp-actions')) return;      // controles del timer
+      if (!Store.activeWorkout || !Store.activeWorkout()) return;
+      const overlay = document.getElementById('activeWorkout');
+      if (overlay && overlay.classList.contains('show')) return;  // ya abierto
+      this.showActiveWorkout();
+    });
   },
 
   refreshAll() {

@@ -359,6 +359,13 @@
 /* Variante UNILATERAL: dos líneas con etiqueta I / D pegada al dato.
    El nombre del ejercicio pasa a permitir wrap para no recortar con
    ellipsis cuando el split toma una segunda línea. */
+.bit-temp-tag{
+  display:inline-block; margin-left:6px;
+  font-size:9px; font-weight:700; letter-spacing:.3px;
+  text-transform:uppercase;
+  color:var(--accent-2); background:var(--accent-bg);
+  border-radius:999px; padding:1px 6px; vertical-align:middle;
+}
 .bit-row.split .bit-name{
   white-space:normal;
   overflow:visible;

@@ -197,10 +197,16 @@ function persist(state) {
       }
       return out;
     })
-    .filter(s => s.weight > 0 && s.reps > 0);
+    // Peso corporal: weight=0 es VÁLIDO (sin carga externa). Para el resto,
+    // exigimos peso > 0. Las reps siempre deben ser > 0.
+    .filter(s => s.reps > 0 && (state.bodyweight ? s.weight >= 0 : s.weight > 0));
 
   Store.removeSessionFor(date, state.ex.id);
   if (doneSets.length === 0) return null;
+
+  // ¿Es un ejercicio temporal (añadido sobre la marcha)? Marca la sesión
+  // para que la Bitácora lo distinga; la rutina nunca se toca.
+  const isTemp = extraItems.some(it => it.exerciseId === state.ex.id && it.temporary);
 
   return Store.addSession({
     date,
@@ -211,6 +217,7 @@ function persist(state) {
     // Override manual del usuario para la próxima sesión (transient en UI,
     // persistido en el log para que suggestNextWeight lo respete).
     ...(state.nextOverride ? { nextOverride: state.nextOverride } : {}),
+    ...(isTemp ? { temporary: true } : {}),
   });
 }
 
@@ -379,8 +386,21 @@ function buildPage(item, pageIdx) {
          - persist() escribe repsL + repsR + reps=L+R en cada set
          - validación: la suma L+R > 0 para marcar ✓ done */
     split: !!ex.unilateralSplit,
+    /* === Modo "Peso corporal" ===
+       Auto-activo para ejercicios marcados progressionType:'bodyweight'
+       (dominadas, fondos, flexiones). Cuando true:
+         - la columna KG se bloquea a 0 (sin carga externa) y muestra "PC"
+         - el foco visual y de entrada es solo las reps
+         - toggle OFF si el usuario quiere registrar lastre (peso añadido)
+       No se persiste por sesión: deriva del flag del ejercicio + el toggle. */
+    bodyweight: ex.progressionType === 'bodyweight',
     prCelebrated: false,
   };
+  // En modo peso corporal arrancamos con weight=0 en todas las filas no
+  // tocadas (lastre vacío); el usuario puede desbloquear para añadir carga.
+  if (state.bodyweight) {
+    state.rows.forEach(r => { if (!r.done && (r.weight === baseW || r.weight === '' || r.weight == null)) r.weight = 0; });
+  }
 
   // ---- Cabecera del ejercicio ----
   // Botón "Tips" junto al nombre. Indicador naranja automático si el
@@ -560,6 +580,7 @@ function buildPage(item, pageIdx) {
                  : '',
       disabled: row.done || undefined,    // bloqueado al completar la serie
     });
+    const isWeight = key === 'weight' || key === 'weightL' || key === 'weightR';
     inp.addEventListener('input', () => {
       const v = inp.value;
       row[key] = v === '' ? '' : (key === 'reps' ? parseInt(v, 10) : parseFloat(v));
@@ -567,9 +588,24 @@ function buildPage(item, pageIdx) {
         row.userW = true;                 // esta fila fue editada a mano
         if (!last) propagateWeight(i);    // solo si no hay registro previo
       }
+      if (isWeight) fitWeightFont(inp);   // re-escala si cambia el nº de dígitos
       if (row.done) schedulePersist();
     });
+    if (isWeight) fitWeightFont(inp);     // estado inicial (valor o placeholder)
     return inp;
+  }
+
+  /**
+   * Escala el font-size del input de KG según los dígitos que muestra (valor
+   * o, si está vacío, su placeholder "ghost"). Evita que un peso de 3+ dígitos
+   * (137, 200, 137.5) se recorte contra los botones ± (fix IMG_6101/6102).
+   * Togglea las clases .dig3 / .dig4 que define active.css.
+   */
+  function fitWeightFont(inp) {
+    const shown = (inp.value && inp.value.length) ? inp.value : (inp.placeholder || '');
+    const digits = String(shown).replace(/[.,\s]/g, '').length;   // sin separadores
+    inp.classList.toggle('dig3', digits === 3);
+    inp.classList.toggle('dig4', digits >= 4);
   }
 
   /* Stepper [- N +] para reps: sin teclado nativo en el gym. Smart default:
@@ -709,10 +745,27 @@ function buildPage(item, pageIdx) {
       }, ...els);
     }
 
-    // Modo bilateral clásico — sin cambios.
+    // Modo bilateral clásico.
+    // Peso corporal: la celda KG se bloquea a "PC" (peso corporal = 0 carga)
+    // y el foco pasa a las reps. Un tap en la pastilla PC desbloquea para
+    // añadir lastre puntualmente sin tener que ir a Ajustes.
+    const kgCell = state.bodyweight
+      ? h('button', {
+          class: 'aw-bw-cell', type: 'button',
+          'aria-label': 'Peso corporal — pulsa para añadir lastre',
+          title: 'Peso corporal (sin carga). Pulsa para añadir lastre.',
+          onClick: () => {
+            // Desbloqueo SOLO de esta sesión (no toca el tipo persistido del
+            // ejercicio). El strip superior permite volver a bloquear.
+            state.bodyweight = false;
+            toast('Lastre activado — añade el peso extra');
+            renderSets();
+          },
+        }, 'PC')
+      : weightField(row, i);
     const baseEls = [
       h('div', { class: 'aw-set-n' }, String(i + 1)),
-      weightField(row, i),
+      kgCell,
     ];
     const midEls = [
       repsStepper(row, 'reps', '', i),
@@ -781,6 +834,7 @@ function buildPage(item, pageIdx) {
       row[key] = next;
       row.userW = true;
       inp.value = next;
+      fitWeightFont(inp);                 // re-escala tras ± (puede pasar a 3 díg.)
       // Autofill solo aplica al campo bilateral (la propagación entre lados
       // independientes sería invasiva — el usuario quiere control fino).
       if (!last && key === 'weight') propagateWeight(i);
@@ -852,6 +906,15 @@ function buildPage(item, pageIdx) {
         row.reps    = totalReps;
         row.weight  = Math.max(wL, wR);
         w           = row.weight;
+      } else if (state.bodyweight) {
+        // Peso corporal: la carga es 0 (sin lastre). Solo exigimos reps.
+        row.weight = 0;
+        w = 0;
+        totalReps = intify(row.reps);
+        if (!(totalReps > 0)) {
+          toast('Pon las reps de la serie', 'bad');
+          return;
+        }
       } else {
         w = numify(row.weight);
         totalReps = intify(row.reps);
@@ -1081,9 +1144,18 @@ function buildPage(item, pageIdx) {
      (preserva su elección en ejercicios custom). */
   const splitToggle = canSplitSides(ex) ? buildSplitToggleStrip(ex, state, renderSets) : null;
 
+  /* === Strip "Peso corporal" ===
+     Solo para ejercicios marcados progressionType:'bodyweight'. Toggle
+     prominente para alternar entre peso corporal puro (KG bloqueado a PC)
+     y modo lastre (KG editable). Session-local: no muta el tipo persistido. */
+  const bodyweightStrip = ex.progressionType === 'bodyweight'
+    ? buildBodyweightStrip(ex, state, renderSets)
+    : null;
+
   el.append(
     head,
     overrideStrip,
+    ...(bodyweightStrip ? [bodyweightStrip] : []),
     ...(splitToggle ? [splitToggle] : []),
     setsHost,
     addBtn,
@@ -1094,6 +1166,45 @@ function buildPage(item, pageIdx) {
     el, ex, item, state,
     refresh() { renderSets(); },
   };
+}
+
+/* === Helper del modo "Peso corporal" ===
+ * Strip prominente con switch iOS. ON = peso corporal puro (KG bloqueado a
+ * "PC", solo reps). OFF = lastre (KG editable). Es session-local: NO toca
+ * el progressionType persistido del ejercicio (ese se cambia en Ajustes).
+ * Al alternar, re-renderiza las filas (la celda KG cambia de PC a stepper). */
+function buildBodyweightStrip(ex, state, onRender) {
+  const strip = h('div', { class: 'aw-bw-strip' });
+  const render = () => {
+    strip.innerHTML = '';
+    strip.append(
+      h('div', { class: 'aw-bw-main' },
+        h('div', { class: 'aw-bw-title' }, 'Peso corporal'),
+        h('div', { class: 'aw-bw-sub' },
+          state.bodyweight
+            ? 'Sin carga externa · registra solo las reps'
+            : 'Con lastre · introduce el peso añadido'),
+      ),
+      h('button', {
+        class: 'aw-switch' + (state.bodyweight ? ' on' : ''),
+        type: 'button',
+        'aria-pressed': state.bodyweight ? 'true' : 'false',
+        'aria-label': 'Activar / desactivar peso corporal',
+        onClick: () => {
+          state.bodyweight = !state.bodyweight;
+          if (state.bodyweight) {
+            // Al volver a peso corporal: limpiar el lastre de las filas no
+            // completadas (las completadas conservan su registro histórico).
+            state.rows.forEach(r => { if (!r.done) r.weight = 0; });
+          }
+          render();
+          if (onRender) onRender();
+        },
+      }),
+    );
+  };
+  render();
+  return strip;
 }
 
 /* === Helpers del modo "Manos separadas" === */
@@ -1414,15 +1525,17 @@ function addCatalogOnTheFly(catId) {
   const e = catalogToExercise(cat);
   Store.addExerciseFromCatalog(catId);   // crea el ejercicio en biblioteca
   // SOLO para este entrenamiento: no contamina la plantilla de la rutina.
+  // `temporary:true` → la sesión resultante se marca como temporal y se
+  // guarda en la Bitácora, pero el ejercicio NUNCA se añade al día/rutina.
   if (!extraItems.some(it => it.exerciseId === catId)) {
     extraItems.push({
       exerciseId: catId, sets: e.defaultSets, repRange: e.defaultRepRange,
-      rest: Store.getDefaultRest(), days: [],
+      rest: Store.getDefaultRest(), days: [], temporary: true,
     });
   }
   closeSheet();
   rebuildPages(catId);
-  toast(`Añadido (solo hoy): ${e.name}`);
+  toast(`Ejercicio temporal añadido: ${e.name}`);
 }
 
 function openChangeSheet() {
@@ -1480,7 +1593,9 @@ function openChangeSheet() {
       h('div', { class: 'aw-sheet-body' },
         h('div', { class: 'aw-sheet-cap' }, 'Saltar a otro de la rutina'),
         h('div', { class: 'aw-sheet-jump' }, ...jumpList),
-        h('div', { class: 'aw-sheet-cap' }, 'Añadir de la base de datos'),
+        h('div', { class: 'aw-sheet-cap' }, 'Añadir ejercicio temporal'),
+        h('div', { class: 'aw-sheet-note' },
+          'Solo para hoy · se guarda en tu Bitácora pero NO en la rutina.'),
         search,
         listHost,
       ),

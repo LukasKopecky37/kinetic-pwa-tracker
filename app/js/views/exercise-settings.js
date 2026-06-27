@@ -40,7 +40,10 @@ import { vibrate } from '../services/haptics.js';
  * targetRepRange: ranges típicos de double-progression — 5-8 (fuerza),
  * 8-12 (hipertrofia), 12-15 (resistencia muscular), 15-20 (endurance). */
 const REST_PRESETS = [60, 90, 120, 150, 180, 240, 300];
-const INC_PRESETS  = [1.25, 2.5, 5];
+// Incrementos de carga: micro-disco (1.25), disco estándar (2.5/5) y saltos
+// grandes (10/20) para compuestos pesados — sirven igual para subir (+) que
+// para bajar (−), ya que autoIncrementKg es el "paso" en ambas direcciones.
+const INC_PRESETS  = [1.25, 2.5, 5, 10, 20];
 const RANGE_PRESETS = [
   { min: 3,  max: 5,  label: '3–5'  },
   { min: 5,  max: 8,  label: '5–8'  },
@@ -100,10 +103,20 @@ export function openExerciseSettings(exerciseId, onSaved) {
 
   const draft = readSettings(ex);
 
-  openModal('<div id="exSet"></div>');
-  const root = $('#exSet');
+  // Montamos head/body/foot DIRECTAMENTE en #modal (no en un wrapper extra).
+  // El #modal tiene el flex-column + max-height:88vh + overflow:hidden; su
+  // hijo .modal-body lleva overflow-y:auto. Si metiéramos todo dentro de un
+  // <div id="exSet"> intermedio, ese div crecería con el contenido y el
+  // scroll del body NUNCA se activaría → el fondo del modal se cortaba
+  // (bug IMG_6099: "Incremento de carga" quedaba fuera de pantalla).
+  openModal('');
+  const root = $('#modal');
 
   function render() {
+    // Preserva el scroll del body entre re-renders (cada tap de chip re-monta
+    // el modal); sin esto, tocar un chip de "Incremento" abajo te devolvía
+    // bruscamente arriba.
+    const prevScroll = root.querySelector('.modal-body')?.scrollTop || 0;
     mount(root, [
       h('div', { class: 'modal-head' },
         h('h3', null, 'Ajustes · ', h('span', { class: 'exset-exname' }, ex.name)),
@@ -155,8 +168,8 @@ export function openExerciseSettings(exerciseId, onSaved) {
         draft.progressionType !== 'bodyweight'
           ? section('Incremento de carga',
               draft.progressionType === 'assisted'
-                ? 'Cuánto BAJAR la asistencia al cumplir el rango.'
-                : 'Cuánto SUBIR el peso al cumplir el rango.',
+                ? 'Paso de asistencia (sube ▲ o baja ▼) y de los botones ± en la serie.'
+                : 'Paso de peso al subir (+) o bajar (−), en la serie y en la próxima sesión.',
               h('div', { class: 'exset-chip-row' },
                 ...INC_PRESETS.map(kg => h('button', {
                   class: 'exset-chip' + (draft.autoIncrementKg === kg ? ' on' : ''),
@@ -191,6 +204,9 @@ export function openExerciseSettings(exerciseId, onSaved) {
         }, 'Guardar'),
       ),
     ]);
+    // Restaura la posición de scroll tras re-montar.
+    const body = root.querySelector('.modal-body');
+    if (body && prevScroll) body.scrollTop = prevScroll;
   }
 
   function commit() {
