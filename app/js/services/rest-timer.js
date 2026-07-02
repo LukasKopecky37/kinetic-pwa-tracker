@@ -4,26 +4,12 @@
  * Estado vive en el módulo (singleton). El DOM del panel (#restPanel)
  * existe en index.html. `bind()` engancha los botones +/-/stop.
  *
- * Cuando termina:
- *   - vibra
- *   - emite un pitido
- *   - muestra toast 'Descanso terminado'
- *   - dispara una Notification del sistema (si hay permiso) — refactor v55
- *   - tras 1.5s, oculta el panel.
- *
- * Limitaciones honestas sobre notificaciones en iOS PWA:
- *   - iOS 16.4+ con la PWA instalada (Añadir a pantalla de inicio) sí
- *     permite Notification API.
- *   - SIN backend de push, programar una notificación PARA EL FUTURO
- *     mientras la app está cerrada no es posible (no hay Web Push
- *     server-side). Lo que SÍ funciona:
- *       a) Si la PWA sigue en segundo plano con el SW activo, la
- *          Notification se dispara inmediatamente cuando el setTimeout
- *          se cumple (puede sufrir si iOS suspende el SW).
- *       b) Si la PWA está en primer plano, se dispara seguro.
- *   - Live Activities y Local Notifications con scheduler nativo son
- *     APIs iOS exclusivas para apps nativas Swift — no disponibles a
- *     PWAs. Documentado para no prometer lo imposible.
+ * Arquitectura de notificación (v60): programación a nivel de SO cuando el
+ * navegador la soporta (Notification Triggers / TimestampTrigger, Chromium),
+ * con reprogramación estricta en cada ±15 / Saltar. En iOS (sin ese API y
+ * sin backend push) se degrada con honestidad: el timer es wall-clock y
+ * recalcula al volver de segundo plano. Detalle completo en el bloque de
+ * NOTIFICACIONES más abajo.
  */
 
 import { $ } from '../utils/dom.js';
@@ -33,32 +19,49 @@ import { vibrate } from './haptics.js';
 import { toast } from './toast.js';
 
 /* ============================================================================
- * NOTIFICACIONES LOCALES — ciclo de vida robusto (fix bug 4)
+ * NOTIFICACIONES DE FIN DE DESCANSO — programación a nivel de SO (v60)
  *
- * Problema reportado: las notificaciones de "descanso terminado" dejaron de
- * salir. Causas que blindamos aquí:
- *   - Permiso bloqueado en estado 'default' por un guard que NUNCA reintentaba
- *     (la antigua _notifPermissionAsked impedía volver a pedir).
- *   - El disparo dependía de un SW que podía no estar listo.
- *   - Sin limpieza de callbacks viejos entre series (listeners zombi).
+ * ── LA REALIDAD DE PLATAFORMA (importante) ─────────────────────────────────
+ * El bug reportado (la notificación no salta con la app minimizada y se
+ * dispara "toda de golpe" al reabrir) es INHERENTE a las PWAs en iOS: cuando
+ * la app pasa a segundo plano, WebKit SUSPENDE el JS (setInterval/setTimeout
+ * se congelan). Para despertar una PWA suspendida en iOS hace falta un PUSH
+ * de servidor (Web Push vía APNs → requiere backend) o envolver la app en un
+ * contenedor nativo (Capacitor/Swift con UNUserNotificationCenter). El API
+ * web de "notificación programada a un timestamp" (Notification Triggers /
+ * TimestampTrigger) SOLO existe en Chromium (Android/desktop Chrome); Safari
+ * NO lo implementa. No hay forma client-side de sortear esto en iOS.
  *
- * Lo que SÍ se puede en una PWA iOS 16.4+ instalada: mostrar una Notification
- * vía el Service Worker en cuanto el timer llega a 0 (finish). Lo que NO se
- * puede sin backend Web Push: entregar la notificación mientras el JS está
- * suspendido (pantalla bloqueada largo rato). En primer plano iOS suele
- * suprimir el banner de PWA → por eso mantenemos toast+beep+vibración como
- * feedback garantizado en foreground.
+ * ── LO QUE HACE ESTE MÓDULO ────────────────────────────────────────────────
+ *   1. Si el navegador SÍ soporta TimestampTrigger (Android/Chrome): programa
+ *      la notificación en la cola del SO para `endAt`. El SO la entrega SOLO
+ *      con la app en segundo plano — supervivencia real a la suspensión.
+ *   2. Reprogramación estricta: cada ± 15 s o "Saltar" cancela la notif
+ *      pendiente (mismo tag) y agenda una nueva con el nuevo `endAt`.
+ *   3. En iOS (sin TimestampTrigger): degradamos con honestidad — el timer
+ *      wall-clock recalcula al volver (visibilitychange) y `finish()` da el
+ *      feedback in-app; NO se emite un banner tardío inútil.
+ *   4. Foreground: si el timer termina con la app visible, feedback in-app
+ *      (beep + vibración + toast) y se CIERRA cualquier banner del SO para no
+ *      duplicar (equivalente a preferir presentación in-app sobre el banner).
  * ========================================================================== */
+
+const NOTIF_TAG = 'rest-ended';
 
 /** ¿El navegador soporta notificaciones? */
 function notifSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
+/** ¿Soporta programación a futuro a nivel de SO (Notification Triggers)? */
+function supportsTrigger() {
+  return typeof window !== 'undefined' && typeof window.TimestampTrigger === 'function';
+}
+
 /**
  * Pide permiso de notificación. DEBE invocarse desde un gesto del usuario
  * (un click) para que iOS muestre el prompt. Reintenta mientras el estado
- * sea 'default' (sin el guard roto anterior). Devuelve el permiso final.
+ * sea 'default'. Devuelve el permiso final.
  */
 async function ensureNotificationPermission() {
   if (!notifSupported()) return 'unsupported';
@@ -71,38 +74,87 @@ async function ensureNotificationPermission() {
   }
 }
 
-/**
- * Muestra la notificación de fin de descanso. Reevalúa permiso en caliente
- * y prefiere el SW (banner persistente, puede salir con la app en segundo
- * plano); si no hay SW, cae a la Notification directa.
- */
-async function fireRestEndedNotification(exName) {
-  if (!notifSupported()) return;
-  if (Notification.permission !== 'granted') return;
-  const payload = {
+/** Registration del SW lista, o null. */
+async function swReg() {
+  if (!('serviceWorker' in navigator)) return null;
+  return navigator.serviceWorker.ready.catch(() => null);
+}
+
+/** Payload común de la notificación de fin de descanso. */
+function restPayload(exName, extra) {
+  return {
     body: 'Es hora de tu siguiente serie. ¡A por ello!'
           + (exName ? '\n' + exName : ''),
     icon: './icon.svg',
     badge: './icon.svg',
-    tag: 'rest-ended',                  // reemplaza la anterior en la bandeja
+    tag: NOTIF_TAG,                     // un único tag → reemplazo/cancelación
     renotify: true,
     requireInteraction: false,
-    silent: false,                      // ← sonido del SO (equivalente a .sound)
-    vibrate: [200, 100, 200],           // patrón en plataformas que lo soporten
-    data: { kind: 'rest-ended', when: Date.now() },
+    silent: false,                      // sonido del SO (equivalente a .sound)
+    vibrate: [200, 100, 200],
+    data: { kind: 'rest-ended' },
+    ...extra,
   };
+}
+
+/**
+ * Programa la notificación en el SO para `fireAtMs` (timestamp absoluto).
+ * Cancela primero cualquier notif pendiente con el mismo tag (reschedule
+ * limpio). Devuelve true si de verdad quedó PROGRAMADA a nivel de SO
+ * (solo posible con TimestampTrigger), false en caso contrario.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function scheduleRestNotification(fireAtMs, exName) {
+  await cancelScheduledRestNotification();
+  if (!notifSupported() || Notification.permission !== 'granted') return false;
+  if (!supportsTrigger()) return false;              // iOS/Safari → no-op honesto
+  const reg = await swReg();
+  if (!reg || !reg.showNotification) return false;
   try {
-    if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready.catch(() => null);
-      if (reg && reg.showNotification) {
-        await reg.showNotification('¡Descanso terminado!', payload);
-        return;
-      }
-    }
-    // Fallback directo (foreground en plataformas que lo permitan).
-    new Notification('¡Descanso terminado!', payload);
+    await reg.showNotification('¡Descanso terminado!',
+      restPayload(exName, { showTrigger: new window.TimestampTrigger(fireAtMs) }));
+    return true;
   } catch (err) {
-    console.warn('[restTimer] Notification fallback failed:', err);
+    console.warn('[restTimer] showTrigger schedule failed:', err);
+    return false;
+  }
+}
+
+/**
+ * Cancela cualquier notificación de descanso pendiente o ya mostrada (mismo
+ * tag). Se usa al reprogramar (± 15), al saltar, al terminar en foreground y
+ * al matar el timer por fin de entrenamiento.
+ */
+async function cancelScheduledRestNotification() {
+  const reg = await swReg();
+  if (!reg || !reg.getNotifications) return;
+  try {
+    // includeTriggered:true → también las ya disparadas que sigan en bandeja.
+    const list = await reg.getNotifications({ tag: NOTIF_TAG, includeTriggered: true });
+    list.forEach(n => n.close());
+  } catch (err) {
+    console.warn('[restTimer] cancel schedule failed:', err);
+  }
+}
+
+/**
+ * Muestra una notificación INMEDIATA (best-effort). Solo se usa como último
+ * recurso cuando NO hubo programación de SO y el timer terminó con la app en
+ * segundo plano (p.ej. Android sin Triggers). En iOS con JS suspendido esto
+ * nunca llega a ejecutarse a tiempo — por eso no dependemos de ello.
+ */
+async function fireRestEndedNotification(exName) {
+  if (!notifSupported() || Notification.permission !== 'granted') return;
+  try {
+    const reg = await swReg();
+    if (reg && reg.showNotification) {
+      await reg.showNotification('¡Descanso terminado!', restPayload(exName));
+      return;
+    }
+    new Notification('¡Descanso terminado!', restPayload(exName));
+  } catch (err) {
+    console.warn('[restTimer] immediate notification failed:', err);
   }
 }
 
@@ -119,6 +171,9 @@ export const RestTimer = {
   _onComplete: null, // callback one-shot: se dispara al COMPLETAR/SALTAR el
                      // descanso (no al matar el timer por fin de entreno).
                      // Lo usa el flujo de bi-serie para volver al ejercicio A.
+  _scheduled: false, // ¿hay una notificación programada a nivel de SO?
+                     // (solo true en navegadores con TimestampTrigger). Guía
+                     // la decisión de finish() (foreground vs background).
 
   /* Suscriptores externos (p.ej. el timer grande del player). Cada uno
    * recibe el estado en cada tick / start / stop / finish. El panel fijo
@@ -158,8 +213,18 @@ export const RestTimer = {
     this.intervalId = setInterval(() => this.tick(), 1000);
     this.render();
 
-    // Permiso de notificación: lazy en el primer start (gesto de usuario).
-    ensureNotificationPermission().catch(() => {});
+    // Permiso lazy (gesto de usuario) + PROGRAMACIÓN a nivel de SO para
+    // `endAt`. Predictor síncrono `_scheduled` para que finish() sepa si el
+    // SO se encargará; el valor real (según permiso concedido y soporte) se
+    // ajusta cuando resuelve la promesa.
+    this._scheduled = supportsTrigger();
+    ensureNotificationPermission()
+      .then(p => {
+        if (p !== 'granted') { this._scheduled = false; return; }
+        return scheduleRestNotification(this.endAt, this.exName)
+          .then(ok => { this._scheduled = ok; });
+      })
+      .catch(() => { this._scheduled = false; });
   },
 
   /** Dispara (una sola vez) el callback de finalización y lo limpia. */
@@ -186,14 +251,25 @@ export const RestTimer = {
     this.intervalId = null;
     this.remaining = 0;
     this.render();
+    // Feedback in-app SIEMPRE: en foreground es lo que el usuario oye/siente.
     vibrate([200, 100, 200]);
     beepEndOfRest();
     toast('Descanso terminado', 'pr');
-    // Notificación del sistema (cuando hay permiso) — gancho extra para
-    // que el usuario sepa que terminó incluso si tiene el iPhone abajo
-    // o ha cambiado a otra app. Best-effort: si no hay permiso o el SO
-    // suspendió la pestaña antes de tiempo, se cae graceful.
-    fireRestEndedNotification(this.exName);
+
+    const visible = (typeof document !== 'undefined')
+      && document.visibilityState === 'visible';
+    if (visible) {
+      // Foreground: preferimos presentación in-app → cerramos cualquier
+      // banner del SO (programado o ya disparado) para no duplicar.
+      cancelScheduledRestNotification();
+    } else if (!this._scheduled) {
+      // Background SIN programación de SO (Android sin Triggers, o el JS
+      // corrió justo al reanudar): intento inmediato best-effort.
+      fireRestEndedNotification(this.exName);
+    }
+    // Si _scheduled y estamos en background → el SO ya la entregó a tiempo.
+    this._scheduled = false;
+
     // Bi-serie: vuelta automática al ejercicio A (se dispara una vez).
     this._fireComplete();
     if (this._finishTO) clearTimeout(this._finishTO);
@@ -210,6 +286,9 @@ export const RestTimer = {
     this.intervalId = null;
     if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
     this.remaining = 0;
+    // Cleanup estricto: cancela la notificación del SO ya programada.
+    cancelScheduledRestNotification();
+    this._scheduled = false;
     $('#restPanel').classList.remove('show');
     this.notify();
     this._fireComplete();
@@ -226,6 +305,8 @@ export const RestTimer = {
     this.intervalId = null;
     if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
     this._onComplete = null;
+    cancelScheduledRestNotification();
+    this._scheduled = false;
     $('#restPanel').classList.remove('show');
     this.notify();
   },
@@ -241,6 +322,12 @@ export const RestTimer = {
     if (this.remaining <= 0) { this.finish(); return; }
     this.total = Math.max(this.total, this.remaining);
     this.render();
+    // Reprogramación ESTRICTA (requisito 4): cancela la notif previa y agenda
+    // una nueva con el `endAt` actualizado. scheduleRestNotification ya
+    // cancela la anterior con el mismo tag antes de programar.
+    scheduleRestNotification(this.endAt, this.exName)
+      .then(ok => { this._scheduled = ok; })
+      .catch(() => {});
   },
 
   show() {
