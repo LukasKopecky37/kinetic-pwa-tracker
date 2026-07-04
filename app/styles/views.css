@@ -1795,3 +1795,18 @@
   .body-heatmap-svg { max-width: 320px; }
   .body-tooltip { min-width: 160px; max-width: 220px; }
 }
+
+/* ----- Ajustes · Notificaciones (Web Push) ----- */
+.ns-status{
+  font-size:13px; font-weight:600;
+  padding:10px 12px; border-radius:10px;
+  background:var(--neutral-bg); border:1px solid var(--line);
+  color:var(--muted);
+}
+.ns-status.ok{
+  color:var(--good); border-color:var(--good-border); background:var(--good-bg);
+}
+.ns-status.warn{
+  color:var(--accent-2); border-color:rgba(255,164,92,.35);
+  background:rgba(255,164,92,.06); line-height:1.5;
+}

@@ -17,6 +17,7 @@ import { fmtMMSS } from '../utils/format.js';
 import { beepEndOfRest } from './audio.js';
 import { vibrate } from './haptics.js';
 import { toast } from './toast.js';
+import { scheduleRestPush, cancelRestPush } from './push.js';
 
 /* ============================================================================
  * NOTIFICACIONES DE FIN DE DESCANSO — programación a nivel de SO (v60)
@@ -213,16 +214,31 @@ export const RestTimer = {
     this.intervalId = setInterval(() => this.tick(), 1000);
     this.render();
 
-    // Permiso lazy (gesto de usuario) + PROGRAMACIÓN a nivel de SO para
-    // `endAt`. Predictor síncrono `_scheduled` para que finish() sepa si el
-    // SO se encargará; el valor real (según permiso concedido y soporte) se
-    // ajusta cuando resuelve la promesa.
-    this._scheduled = supportsTrigger();
-    ensureNotificationPermission()
+    // Programación de la notificación de fondo (prefiere PUSH de servidor;
+    // fallback a Notification Triggers). `_scheduled` lo fija el helper.
+    this._scheduled = false;
+    this._scheduleBackground(seconds, this.exName);
+  },
+
+  /**
+   * Programa la notificación de fin de descanso para que llegue AUNQUE la
+   * app esté en segundo plano / el móvil bloqueado.
+   *   1º · PUSH de servidor (push.js → /api/schedule → QStash → APNs). Es lo
+   *        único que funciona con la pantalla bloqueada en iOS.
+   *   2º · Fallback: Notification Triggers a nivel de SO (Chromium/Android).
+   *        En iOS es no-op → dependemos de finish() al volver a foreground.
+   * @param {number} delaySeconds
+   * @param {string} exName
+   */
+  _scheduleBackground(delaySeconds, exName) {
+    return ensureNotificationPermission()
       .then(p => {
         if (p !== 'granted') { this._scheduled = false; return; }
-        return scheduleRestNotification(this.endAt, this.exName)
-          .then(ok => { this._scheduled = ok; });
+        return scheduleRestPush(delaySeconds, exName).then(pushed => {
+          if (pushed) { this._scheduled = true; return; }
+          return scheduleRestNotification(this.endAt, this.exName)
+            .then(ok => { this._scheduled = ok; });
+        });
       })
       .catch(() => { this._scheduled = false; });
   },
@@ -259,8 +275,9 @@ export const RestTimer = {
     const visible = (typeof document !== 'undefined')
       && document.visibilityState === 'visible';
     if (visible) {
-      // Foreground: preferimos presentación in-app → cerramos cualquier
-      // banner del SO (programado o ya disparado) para no duplicar.
+      // Foreground: preferimos presentación in-app → cancelamos el push de
+      // servidor programado y cerramos cualquier banner del SO (no duplicar).
+      cancelRestPush();
       cancelScheduledRestNotification();
     } else if (!this._scheduled) {
       // Background SIN programación de SO (Android sin Triggers, o el JS
@@ -286,7 +303,8 @@ export const RestTimer = {
     this.intervalId = null;
     if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
     this.remaining = 0;
-    // Cleanup estricto: cancela la notificación del SO ya programada.
+    // Cleanup estricto: cancela el push de servidor Y la notif del SO.
+    cancelRestPush();
     cancelScheduledRestNotification();
     this._scheduled = false;
     $('#restPanel').classList.remove('show');
@@ -305,6 +323,7 @@ export const RestTimer = {
     this.intervalId = null;
     if (this._finishTO) { clearTimeout(this._finishTO); this._finishTO = null; }
     this._onComplete = null;
+    cancelRestPush();
     cancelScheduledRestNotification();
     this._scheduled = false;
     $('#restPanel').classList.remove('show');
@@ -322,12 +341,9 @@ export const RestTimer = {
     if (this.remaining <= 0) { this.finish(); return; }
     this.total = Math.max(this.total, this.remaining);
     this.render();
-    // Reprogramación ESTRICTA (requisito 4): cancela la notif previa y agenda
-    // una nueva con el `endAt` actualizado. scheduleRestNotification ya
-    // cancela la anterior con el mismo tag antes de programar.
-    scheduleRestNotification(this.endAt, this.exName)
-      .then(ok => { this._scheduled = ok; })
-      .catch(() => {});
+    // Reprogramación ESTRICTA (± 15): reprograma la notif de fondo (push o
+    // trigger) con el nuevo tiempo restante. Los helpers cancelan la anterior.
+    this._scheduleBackground(this.remaining, this.exName);
   },
 
   show() {

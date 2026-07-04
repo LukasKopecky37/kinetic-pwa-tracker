@@ -26,6 +26,7 @@ import { toast } from '../services/toast.js';
 import { exportJSON, importJSON } from '../services/backup.js';
 import { seedHistoricalData } from '../store/import-history.js';
 import { openExerciseSettings } from './exercise-settings.js';
+import { isPushSupported, isSubscribed, enablePush, sendTestPush } from '../services/push.js';
 import { App } from '../app.js';
 
 /* ============================================================================
@@ -54,6 +55,10 @@ export function openSettings(section) {
         <div><div class="mr-title">Descanso por defecto</div><div class="mr-sub">${fmtMMSS(Store.getDefaultRest())}</div></div>
         <div class="mr-arrow">›</div>
       </div>
+      <div class="menu-row" data-go="notifications">
+        <div><div class="mr-title">Notificaciones</div><div class="mr-sub">aviso de fin de descanso (móvil bloqueado)</div></div>
+        <div class="mr-arrow">›</div>
+      </div>
       <div class="menu-row" data-go="data">
         <div><div class="mr-title">Datos</div><div class="mr-sub">exportar, importar, restablecer</div></div>
         <div class="mr-arrow">›</div>
@@ -72,11 +77,80 @@ export function openSettings(section) {
       r.addEventListener('click', () => openSettings(r.dataset.go));
     });
   }
-  if (section === 'mesos')    renderMesoSection();
-  if (section === 'routines') renderRoutinesSection();
-  if (section === 'library')  renderLibrarySection();
-  if (section === 'rest')     renderRestSection();
-  if (section === 'data')     renderDataSection();
+  if (section === 'mesos')         renderMesoSection();
+  if (section === 'routines')      renderRoutinesSection();
+  if (section === 'library')       renderLibrarySection();
+  if (section === 'rest')          renderRestSection();
+  if (section === 'notifications') renderNotificationsSection();
+  if (section === 'data')          renderDataSection();
+}
+
+/* ============================================================================
+   NOTIFICACIONES (Web Push) — activar + probar
+   ============================================================================ */
+function renderNotificationsSection() {
+  const body = $('#settingsBody');
+  const supported = isPushSupported();
+
+  body.innerHTML = `
+    <h4>Aviso de fin de descanso</h4>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 14px">
+      Recibe una notificación cuando termine el descanso, aunque tengas el
+      móvil bloqueado o la app en segundo plano.
+    </p>
+    ${supported ? `
+      <div class="ns-status" id="nsStatus">Comprobando estado…</div>
+      <div class="actions" style="margin-top:14px;flex-direction:column;gap:8px">
+        <button class="btn" id="nsEnable">Activar notificaciones</button>
+        <button class="btn secondary" id="nsTest">Enviar prueba</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin:14px 0 0">
+        En iPhone debes tener la app <b>añadida a la pantalla de inicio</b>
+        (Compartir → Añadir a inicio) y abrirla desde ahí para que iOS permita
+        las notificaciones.
+      </p>
+    ` : `
+      <div class="ns-status warn">Este navegador no admite notificaciones push.
+      En iPhone: abre la app desde el icono de la pantalla de inicio (no desde Safari).</div>
+    `}
+    <div class="actions" style="margin-top:18px"><button class="btn secondary" id="nsBack">‹ Volver</button></div>
+  `;
+
+  $('#nsBack').addEventListener('click', () => openSettings('menu'));
+  if (!supported) return;
+
+  const statusEl = $('#nsStatus');
+  const refreshStatus = async () => {
+    const on = await isSubscribed();
+    statusEl.textContent = on
+      ? '✓ Notificaciones activadas en este dispositivo'
+      : 'Notificaciones no activadas todavía';
+    statusEl.className = 'ns-status' + (on ? ' ok' : '');
+  };
+  refreshStatus();
+
+  $('#nsEnable').addEventListener('click', async () => {
+    const btn = $('#nsEnable');
+    btn.disabled = true; btn.textContent = 'Activando…';
+    const ok = await enablePush();
+    btn.disabled = false; btn.textContent = 'Activar notificaciones';
+    toast(ok ? 'Notificaciones activadas' : 'No se pudo activar (permiso denegado)', ok ? 'pr' : 'bad');
+    refreshStatus();
+  });
+
+  $('#nsTest').addEventListener('click', async () => {
+    const btn = $('#nsTest');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    const r = await sendTestPush();
+    btn.disabled = false; btn.textContent = 'Enviar prueba';
+    if (r && r.ok) {
+      toast('Prueba enviada — mira la notificación', 'pr');
+    } else {
+      const detail = r && (r.error || r.statusCode) ? ` (${r.error || r.statusCode})` : '';
+      toast('No llegó la prueba' + detail, 'bad');
+    }
+    refreshStatus();
+  });
 }
 
 /* ============================================================================

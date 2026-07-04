@@ -14,7 +14,7 @@
  * descargar la nueva shell. Al activar, las caches antiguas se borran.
  */
 
-const CACHE_VERSION = 'rutina-v60';
+const CACHE_VERSION = 'rutina-v61';
 
 // Lista del shell (rutas relativas a la raíz del servidor que sirve la app).
 const SHELL = [
@@ -57,6 +57,7 @@ const SHELL = [
   './js/services/backup.js',
   './js/services/pwa.js',
   './js/services/confetti.js',
+  './js/services/push.js',
 
   './js/analytics/one-rm.js',
   './js/analytics/progression.js',
@@ -114,6 +115,27 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
+/* ------------------------------- PUSH --------------------------- *
+ * Recibe el Web Push del backend (vía QStash → /api/fire) cuando termina
+ * el descanso. Llega AUNQUE la PWA esté suspendida / el iPhone bloqueado,
+ * porque lo entrega el sistema (APNs). Muestra la notificación.
+ * ----------------------------------------------------------------- */
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+  const title = data.title || '¡Descanso terminado!';
+  const body  = data.body  || 'Es hora de tu siguiente serie. ¡A por ello!';
+  event.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: './icon.svg',
+    badge: './icon.svg',
+    tag: 'rest-ended',
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: { kind: 'rest-ended' },
+  }));
+});
+
 /* ------------------------ NOTIFICATIONCLICK ---------------------- *
  * Click en la notificación "¡Descanso terminado!" → traer al frente
  * la pestaña / ventana del PWA si existe; si no, abrir una nueva.
@@ -144,6 +166,10 @@ self.addEventListener('fetch', (event) => {
   // nuevos para actualizar el Service Worker (si lo sirviéramos de caché,
   // el usuario quedaría congelado para siempre tras instalar en el móvil).
   if (url.pathname.endsWith('/sw.js')) return;
+
+  // NUNCA cachear ni interceptar los endpoints del backend (/api/*): son
+  // llamadas dinámicas (schedule/cancel/test-push). Que pasen directas a red.
+  if (url.pathname.startsWith('/api/')) return;
 
   // CDN libraries: stale-while-revalidate
   if (CDN_HOSTS.some(h => url.hostname.includes(h))) {
