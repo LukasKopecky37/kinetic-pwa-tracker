@@ -961,12 +961,23 @@
   border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:6px;
   display:flex; justify-content:space-between; align-items:center; gap:8px;
 }
+.lib-row{ align-items:flex-start; }
+.lib-row .lr-main{ min-width:0; flex:1; }
 .lib-row .lr-name{ font-weight:600; font-size:14px; }
-.lib-row .lr-group{ font-size:11px; color:var(--muted); }
-.lib-row .lr-actions{ display:flex; gap:4px; }
+.lib-row .lr-group{ font-size:11px; color:var(--muted); margin-top:2px; }
+.lib-row .lr-tips-snippet{
+  font-size:11px; color:var(--accent-2); margin-top:5px; line-height:1.4;
+  overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+}
+.lib-row .lr-actions{ display:flex; gap:4px; flex-shrink:0; }
 .lib-row .lr-actions button{
-  background:var(--neutral-bg); border:0; color:var(--text);
+  background:var(--neutral-bg); border:1px solid transparent; color:var(--text);
   width:30px; height:30px; border-radius:6px; cursor:pointer; font-size:13px;
+  display:flex; align-items:center; justify-content:center;
+}
+.lib-row .lr-actions .b-tips{ filter:grayscale(1) opacity(.5); }
+.lib-row .lr-actions .b-tips.has{
+  filter:none; border-color:rgba(255,107,0,.4); background:var(--accent-bg);
 }
 
 /* ----- Picker (modal de selección) ----- */
@@ -1809,4 +1820,35 @@
 .ns-status.warn{
   color:var(--accent-2); border-color:rgba(255,164,92,.35);
   background:rgba(255,164,92,.06); line-height:1.5;
+}
+
+/* ----- Progreso · tarjeta Notas / Tips del ejercicio ----- */
+.pg-tips-card{
+  background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--radius); padding:12px 14px; margin:0 0 14px;
+}
+.pg-tips-card.empty{ border-style:dashed; }
+.pg-tips-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-bottom:8px;
+}
+.pg-tips-title{
+  font-size:12px; font-weight:800; letter-spacing:.4px;
+  text-transform:uppercase; color:var(--accent-2);
+}
+.pg-tips-edit{
+  background:var(--neutral-bg); border:1px solid var(--line);
+  color:var(--accent-2); cursor:pointer;
+  font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.pg-tips-edit:hover{ background:var(--accent-bg); border-color:var(--accent); color:var(--accent); }
+.pg-tips-edit:active{ transform:scale(.96); }
+.pg-tips-body{
+  font-size:14px; color:var(--text); line-height:1.5;
+  white-space:pre-wrap;          /* respeta saltos de línea de las notas */
+  word-break:break-word;
+}
+.pg-tips-empty{
+  font-size:13px; color:var(--muted); line-height:1.5;
 }

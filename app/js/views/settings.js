@@ -26,6 +26,7 @@ import { toast } from '../services/toast.js';
 import { exportJSON, importJSON } from '../services/backup.js';
 import { seedHistoricalData } from '../store/import-history.js';
 import { openExerciseSettings } from './exercise-settings.js';
+import { openTipsModal } from '../services/tips-modal.js';
 import { isPushSupported, isSubscribed, enablePush, sendTestPush } from '../services/push.js';
 import { App } from '../app.js';
 
@@ -759,15 +760,36 @@ function openLibraryPicker(routineId) {
    ============================================================================ */
 function renderLibrarySection() {
   const exs = Store.exercises();
-  const list = exs.map(e => `
+  // Snippet de una línea de las notas (para ver de un vistazo qué ejercicios
+  // ya tienen tips guardados). Colapsa saltos de línea y trunca a ~90 chars.
+  const snippet = (t) => {
+    const s = (t || '').replace(/\s+/g, ' ').trim();
+    return s.length > 90 ? s.slice(0, 90) + '…' : s;
+  };
+
+  const list = exs.map(e => {
+    const hasTips = !!(e.tips && e.tips.trim());
+    return `
     <div class="lib-row" data-id="${e.id}">
-      <div><div class="lr-name">${escapeH(e.name)}</div><div class="lr-group">${escapeH(e.group)}${e.compound ? ' · compuesto' : ''}</div></div>
-      <div class="lr-actions"><button class="b-edit" title="Editar">✎</button><button class="b-del" title="Eliminar">×</button></div>
-    </div>
-  `).join('');
+      <div class="lr-main">
+        <div class="lr-name">${escapeH(e.name)}</div>
+        <div class="lr-group">${escapeH(e.group)}${e.compound ? ' · compuesto' : ''}</div>
+        ${hasTips ? `<div class="lr-tips-snippet">💡 ${escapeH(snippet(e.tips))}</div>` : ''}
+      </div>
+      <div class="lr-actions">
+        <button class="b-tips${hasTips ? ' has' : ''}" title="Notas / Tips">💡</button>
+        <button class="b-edit" title="Editar">✎</button>
+        <button class="b-del" title="Eliminar">×</button>
+      </div>
+    </div>`;
+  }).join('');
 
   $('#settingsBody').innerHTML = `
     <h4>Biblioteca de ejercicios</h4>
+    <p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px">
+      Todos tus ejercicios y sus notas técnicas. Toca 💡 para ver o editar los
+      tips de cualquiera, incluso fuera del entrenamiento.
+    </p>
     ${list || '<div class="empty">Sin ejercicios.</div>'}
     <div class="actions" style="margin-top:14px">
       <button class="btn small" id="bNewLib">+ Nuevo ejercicio</button>
@@ -779,6 +801,10 @@ function renderLibrarySection() {
   $('#bNewLib').addEventListener('click', () => openExerciseEditor(null, () => openSettings('library')));
 
   $$('#settingsBody .lib-row').forEach(r => {
+    const ex = Store.exerciseById(r.dataset.id);
+    r.querySelector('.b-tips').addEventListener('click', () => {
+      if (ex) openTipsModal(ex, () => openSettings('library'));
+    });
     r.querySelector('.b-edit').addEventListener('click', () => openExerciseEditor(r.dataset.id, () => openSettings('library')));
     r.querySelector('.b-del').addEventListener('click', () => {
       if (!confirm('¿Eliminar este ejercicio?')) return;

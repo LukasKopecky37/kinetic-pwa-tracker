@@ -15,6 +15,7 @@ import { topWeight, topSet } from '../analytics/prs.js';
 import { renderProgressChart } from '../charts/progress.js';
 import { renderExerciseVolumeChart } from '../charts/exercise-volume.js';
 import { StatsCard } from '../components/StatsCard.js';
+import { openTipsModal } from '../services/tips-modal.js';
 
 let chart = null;       // A · fuerza (top set)
 let chartVol = null;    // B · volumen total por sesión
@@ -31,6 +32,10 @@ export function renderProgress() {
   const sessions = Store.sessionsByExercise(exId, true);
   const stats = $('#progressStats');
   const sugBox = $('#suggestionBox');
+
+  // Tarjeta de Notas / Tips — independiente de si hay sesiones registradas
+  // (las notas técnicas son útiles incluso antes del primer entreno).
+  renderTipsCard(ex);
 
   if (!ex || sessions.length === 0) {
     mount(stats, h('div', { class: 'empty', style: { gridColumn: '1/-1' } }, 'Sin datos para este ejercicio.'));
@@ -75,4 +80,34 @@ export function renderProgress() {
   const isUnilateral = !!(ex.unilateralSplit && hasSplitData);
   chart    = renderProgressChart($('#chartCanvas'), sessions, avgPos, { isUnilateral });
   chartVol = renderExerciseVolumeChart($('#volumeCanvas'), sessions, { isUnilateral });
+}
+
+/**
+ * Tarjeta "Notas · Tips" del ejercicio seleccionado. Lee `ex.tips`. Si hay
+ * notas, las muestra; si no, un estado vacío que invita a añadirlas. En ambos
+ * casos un botón abre el editor compartido (openTipsModal) y refresca al
+ * guardar. Así las notas escritas durante el entreno se leen y editan también
+ * desde aquí, fuera del entrenamiento.
+ */
+function renderTipsCard(ex) {
+  const host = $('#progressTips');
+  if (!host) return;
+  if (!ex) { host.innerHTML = ''; return; }
+
+  const hasTips = !!(ex.tips && ex.tips.trim());
+  const edit = () => openTipsModal(ex, () => renderProgress());
+
+  mount(host, h('div', { class: 'pg-tips-card' + (hasTips ? '' : ' empty') },
+    h('div', { class: 'pg-tips-head' },
+      h('div', { class: 'pg-tips-title' }, '💡 Notas · Tips'),
+      h('button', {
+        class: 'pg-tips-edit', type: 'button',
+        onClick: edit,
+      }, hasTips ? 'Editar' : 'Añadir'),
+    ),
+    hasTips
+      ? h('div', { class: 'pg-tips-body' }, ex.tips)
+      : h('div', { class: 'pg-tips-empty' },
+          'Sin notas todavía. Guarda aquí configuraciones de máquina, claves técnicas o recordatorios de foco para este ejercicio.'),
+  ));
 }
