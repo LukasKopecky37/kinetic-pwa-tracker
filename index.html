@@ -197,7 +197,10 @@
     .hero-glow { animation: heroGlow 7s ease-in-out infinite; }
     @keyframes heroGlow { 0%,100% { opacity: .72; } 50% { opacity: 1; } }
 
-    /* Barrido de brillo sobre el título plateado */
+    /* Barrido de brillo sobre el título plateado.
+       OJO: el shorthand `background` RESETEA background-clip a border-box →
+       hay que RE-declarar el clip a `text` aquí, o el gradiente llena todo el
+       rectángulo del h1 y el texto (transparent) desaparece. */
     .hero h1 {
       background:
         linear-gradient(115deg, transparent 42%, rgba(255,255,255,.92) 50%, transparent 58%),
@@ -205,6 +208,9 @@
       background-size: 260% 100%, 100% 100%;
       background-position: 180% 0, 0 0;
       background-repeat: no-repeat;
+      -webkit-background-clip: text;
+              background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     /* Entrada escalonada del contenido */
