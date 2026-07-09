@@ -141,6 +141,89 @@
   }
   .tag b { color: var(--accent); font-weight: 700; }
 
+  /* ============================================================
+     HERO "LIVING DASHBOARD" · backdrop de datos vivo
+     ============================================================ */
+  .hero { overflow: hidden; }
+  .hero-bg {
+    position: absolute; inset: 0; z-index: 0;
+    overflow: hidden; pointer-events: none;
+  }
+  .hero-inner { position: relative; z-index: 1; }
+
+  /* Rejilla sutil de "dashboard", enmascarada hacia el centro */
+  .hero-grid {
+    position: absolute; inset: -2px 0 0 0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: radial-gradient(125% 80% at 50% 34%, #000 26%, transparent 76%);
+            mask-image: radial-gradient(125% 80% at 50% 34%, #000 26%, transparent 76%);
+    opacity: .55;
+    transform: translate3d(var(--px,0px), var(--py,0px), 0);
+  }
+
+  /* Gráfico de progresión que se auto-dibuja, anclado al pie del hero */
+  .hero-chart {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    width: 100%; height: min(46%, 320px);
+    transform: translate3d(calc(var(--px,0px) * 1.8), 0, 0);
+  }
+  .hero-chart .hc-line {
+    fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(0 0 9px rgba(255,107,0,.55));
+  }
+  /* Glow que respira detrás del título */
+  .hero-glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(560px 380px at 50% 33%, rgba(255,107,0,.14), transparent 66%);
+    transform: translate3d(calc(var(--px,0px) * -1.2), calc(var(--py,0px) * -1.2), 0);
+  }
+
+  /* --- Capa de MOVIMIENTO: solo si el usuario no pidió reducirlo. Sin esto,
+         el hero se ve estático y perfecto (título plateado, chart ya dibujado). --- */
+  @media (prefers-reduced-motion: no-preference) {
+    /* Auto-dibujado del chart */
+    .hero-chart .hc-line {
+      stroke-dasharray: 2000; stroke-dashoffset: 2000;
+      animation: hcDraw 2.3s cubic-bezier(.55,.02,.2,1) .25s forwards;
+    }
+    .hero-chart .hc-area { opacity: 0; animation: hcArea 1.3s ease-out 1s forwards; }
+    @keyframes hcDraw { to { stroke-dashoffset: 0; } }
+    @keyframes hcArea { to { opacity: 1; } }
+
+    /* Glow que respira */
+    .hero-glow { animation: heroGlow 7s ease-in-out infinite; }
+    @keyframes heroGlow { 0%,100% { opacity: .72; } 50% { opacity: 1; } }
+
+    /* Barrido de brillo sobre el título plateado */
+    .hero h1 {
+      background:
+        linear-gradient(115deg, transparent 42%, rgba(255,255,255,.92) 50%, transparent 58%),
+        linear-gradient(180deg, #ffffff 0%, #b2b2b8 100%);
+      background-size: 260% 100%, 100% 100%;
+      background-position: 180% 0, 0 0;
+      background-repeat: no-repeat;
+    }
+
+    /* Entrada escalonada del contenido */
+    .hero-inner > * { opacity: 0; transform: translateY(15px); }
+    .hero .eyebrow  { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .05s forwards; }
+    .hero h1        { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .12s forwards,
+                                  heroSheen 6.5s ease-in-out 1.6s infinite; }
+    .hero .subtitle { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .22s forwards; }
+    .hero .body     { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .30s forwards; }
+    .hero-tags      { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .40s forwards; }
+    .hero .cta-row  { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .50s forwards; }
+    .hero .cta-note { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) .58s forwards; }
+    @keyframes heroIn { to { opacity: 1; transform: none; } }
+    @keyframes heroSheen {
+      0%, 55%   { background-position: 180% 0, 0 0; }
+      82%, 100% { background-position: -90% 0, 0 0; }
+    }
+  }
+
   /* CTA principal · "Probar la app" */
   .cta-row {
     display: flex;
@@ -1489,35 +1572,61 @@
 <!-- ============================================================
      1 · HERO
      ============================================================ -->
-<section class="hero">
-  <div class="eyebrow">Case Study · 2026</div>
-  <h1>KINETIC PWA<br>TRACKER</h1>
-  <p class="subtitle">
-    <b>Case Study:</b> Pushing the Frontiers of AI-Collaborative Software Engineering.
-  </p>
-  <p class="body">
-    Un experimento de optimización de flujos de desarrollo donde <b>modelos fundacionales avanzados</b> generan código bajo dirección humana estricta, y donde yo asumo el rol de <b>Product Owner</b>: arquitectura, métricas de calidad, decisiones de UX y validación contra datos reales. La IA multiplica la velocidad de implementación; la dirección de producto no se delega.
-    <br><br>
-    Resultado: una PWA <b>vanilla JS sin frameworks</b>, offline-first, instalable, construida sobre datos reales de seis meses de entrenamiento. Cero dependencias en runtime. Cero build step. Diseño que paso horas mirando.
-  </p>
-  <div class="hero-tags">
-    <span class="tag"><b>Vanilla JS</b> · 0 dependencies</span>
-    <span class="tag"><b>586</b> sesiones reales</span>
-    <span class="tag"><b>PWA</b> offline-first</span>
-    <span class="tag"><b>Human-in-the-loop</b></span>
+<section class="hero" id="hero">
+  <!-- Backdrop "Living Dashboard": rejilla + gráfico de progresión auto-dibujado
+       + glow. Puramente decorativo (aria-hidden). Se degrada a estático con
+       prefers-reduced-motion. -->
+  <div class="hero-bg" aria-hidden="true">
+    <div class="hero-grid"></div>
+    <svg class="hero-chart" viewBox="0 0 1200 400" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="hcLine" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ff6b00" stop-opacity=".45"/>
+          <stop offset="1" stop-color="#ffa45c"/>
+        </linearGradient>
+        <linearGradient id="hcFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ff6b00" stop-opacity=".20"/>
+          <stop offset="1" stop-color="#ff6b00" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path class="hc-area" fill="url(#hcFill)"
+            d="M0,335 L90,340 L170,315 L255,325 L340,290 L430,300 L515,262 L600,272 L690,235 L780,245 L870,205 L960,180 L1050,150 L1140,110 L1200,80 L1200,400 L0,400 Z"/>
+      <path class="hc-line" stroke="url(#hcLine)" vector-effect="non-scaling-stroke"
+            d="M0,335 L90,340 L170,315 L255,325 L340,290 L430,300 L515,262 L600,272 L690,235 L780,245 L870,205 L960,180 L1050,150 L1140,110 L1200,80"/>
+    </svg>
+    <div class="hero-glow"></div>
   </div>
 
-  <!-- CTA principal · enlaza a la app deployada en /app/ del mismo dominio.
-       Path relativo → no necesita actualización si cambia la URL del site. -->
-  <div class="cta-row">
-    <a href="/app/" class="cta-primary" target="_blank" rel="noopener">
-      Abrir la app · empieza desde cero
-      <span class="arrow">→</span>
-    </a>
+  <div class="hero-inner">
+    <div class="eyebrow">Case Study · 2026</div>
+    <h1>KINETIC PWA<br>TRACKER</h1>
+    <p class="subtitle">
+      <b>Case Study:</b> Pushing the Frontiers of AI-Collaborative Software Engineering.
+    </p>
+    <p class="body">
+      Un experimento de optimización de flujos de desarrollo donde <b>modelos fundacionales avanzados</b> generan código bajo dirección humana estricta, y donde yo asumo el rol de <b>Product Owner</b>: arquitectura, métricas de calidad, decisiones de UX y validación contra datos reales. La IA multiplica la velocidad de implementación; la dirección de producto no se delega.
+      <br><br>
+      Resultado: una PWA <b>vanilla JS sin frameworks</b>, offline-first, instalable, construida sobre datos reales de seis meses de entrenamiento. Cero dependencias en runtime. Cero build step. Diseño que paso horas mirando.
+    </p>
+    <div class="hero-tags">
+      <span class="tag"><b>Vanilla JS</b> · 0 dependencies</span>
+      <span class="tag"><b data-count="586">586</b> sesiones reales</span>
+      <span class="tag"><b>PWA</b> offline-first</span>
+      <span class="tag"><b>Human-in-the-loop</b></span>
+    </div>
+
+    <!-- CTA principal · enlaza a la app deployada en /app/ del mismo dominio.
+         Path relativo → no necesita actualización si cambia la URL del site. -->
+    <div class="cta-row">
+      <a href="/app/" class="cta-primary" target="_blank" rel="noopener">
+        Abrir la app · empieza desde cero
+        <span class="arrow">→</span>
+      </a>
+    </div>
+    <p class="cta-note">
+      <b>Sin registro · sin servidor</b> — tus datos viven en tu navegador. Instalable como PWA en iOS desde Safari (Compartir → Añadir a pantalla de inicio).
+    </p>
   </div>
-  <p class="cta-note">
-    <b>Sin registro · sin servidor</b> — tus datos viven en tu navegador. Instalable como PWA en iOS desde Safari (Compartir → Añadir a pantalla de inicio).
-  </p>
 </section>
 
 <!-- ============================================================
@@ -2117,6 +2226,51 @@ this.remaining = Math.round((this.endAt - Date.now()) / 1000);
 <script>
 (function(){
   'use strict';
+
+  /* ============================================================
+     HERO "Living Dashboard" · count-up de stats + parallax de ratón.
+     Todo respeta prefers-reduced-motion (si el usuario lo pide, no anima).
+     ============================================================ */
+  (function heroLiving(){
+    const hero = document.getElementById('hero');
+    if (!hero) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+
+    // Count-up de los números marcados con data-count (ej. "586 sesiones").
+    document.querySelectorAll('.hero-tags b[data-count]').forEach(el => {
+      const to = parseInt(el.getAttribute('data-count'), 10) || 0;
+      let t0 = null; const dur = 1500;
+      el.textContent = '0';
+      function step(ts){
+        if (t0 === null) t0 = ts;
+        const p = Math.min(1, (ts - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);   // easeOutCubic
+        el.textContent = Math.round(to * eased).toString();
+        if (p < 1) requestAnimationFrame(step); else el.textContent = String(to);
+      }
+      requestAnimationFrame(step);
+    });
+
+    // Parallax sutil de las capas del backdrop (solo con puntero fino = ratón).
+    if (window.matchMedia('(pointer:fine)').matches) {
+      let tx = 0, ty = 0, raf = null;
+      const apply = () => {
+        hero.style.setProperty('--px', tx.toFixed(1) + 'px');
+        hero.style.setProperty('--py', ty.toFixed(1) + 'px');
+        raf = null;
+      };
+      hero.addEventListener('mousemove', (e) => {
+        const r = hero.getBoundingClientRect();
+        tx = ((e.clientX - r.left) / r.width  - 0.5) * 16;
+        ty = ((e.clientY - r.top)  / r.height - 0.5) * 11;
+        if (!raf) raf = requestAnimationFrame(apply);
+      });
+      hero.addEventListener('mouseleave', () => {
+        tx = 0; ty = 0; if (!raf) raf = requestAnimationFrame(apply);
+      });
+    }
+  })();
 
   /* ============================================================
      Cronómetro HH:MM:SS · arranca al cargar
