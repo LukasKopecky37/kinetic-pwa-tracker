@@ -199,39 +199,44 @@
     align-items: stretch;
     flex-wrap: wrap;
   }
+  /* El marco NO fija su propia altura: la marca el `.phone-screen`, cuyo
+     aspect-ratio es EXACTAMENTE el de las capturas (1206×2622). Así el
+     `object-fit: cover` no recorta nada (antes el padding uniforme sobre un
+     marco 9/19.5 hacía la pantalla interior más alta que la imagen → se
+     comían los lados y clipaba "Mi rutina"). Radios concéntricos: el radio
+     interior = exterior − padding, detalle de acabado premium. */
   .phone-mockup {
     position: relative;
     width: 280px;
-    aspect-ratio: 9 / 19.5;
-    background: linear-gradient(180deg, #232328 0%, #0e0e10 100%);
-    border-radius: 44px;
-    padding: 12px;
+    background: linear-gradient(155deg, #34343a 0%, #1b1b1f 42%, #0c0c0e 100%);
+    border-radius: 46px;
+    padding: 10px;
     box-shadow:
-      0 1px 0 rgba(255,255,255,.05) inset,
-      0 0 0 1.5px #2a2a30,
-      0 30px 80px rgba(0,0,0,.55),
-      0 0 60px rgba(255,107,0,.04);
+      0 0 0 1px rgba(255,255,255,.07) inset,   /* canto interior brillante (metal) */
+      0 1px 1px rgba(255,255,255,.10) inset,   /* reflejo superior */
+      0 0 0 1.5px rgba(0,0,0,.9),              /* canto negro fino exterior */
+      0 34px 70px -24px rgba(0,0,0,.75),       /* sombra proyectada direccional */
+      0 4px 14px rgba(0,0,0,.4),
+      0 0 60px rgba(255,107,0,.05);            /* halo naranja de marca */
   }
   .phone-screen {
     position: relative;
     width: 100%;
-    height: 100%;
+    aspect-ratio: 1206 / 2622;   /* = ratio EXACTO de las capturas → 0 recorte */
     background: #0b0b0d;
-    border-radius: 34px;
+    border-radius: 36px;         /* 46 (marco) − 10 (padding) = concéntrico */
     overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    box-shadow: 0 0 0 1.5px rgba(0,0,0,.85);  /* separación limpia bezel↔pantalla */
   }
-  /* La captura del iPhone YA incluye su status bar y Dynamic Island reales.
-     No dibujamos ninguna isla falsa encima — eso era lo que tapaba el header
-     "Mi rutina" y rompía el encaje. */
+  /* La captura del iPhone YA incluye su status bar y Dynamic Island reales,
+     así que no dibujamos isla falsa. object-position:top ancla el header
+     arriba → "Mi rutina" nunca se recorta (cualquier redondeo se come abajo). */
   .phone-screen img {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center center;
+    object-position: top center;
     position: relative;
     z-index: 2; /* tapa el fallback cuando carga */
   }
@@ -1440,8 +1445,9 @@
     .hero { padding: 90px 18px 70px; }
     .mobile-context { padding: 20px 14px 70px; }
     /* Móviles SIEMPRE lado a lado · sin wrap, escalando proporcionalmente.
-       Cada item ocupa la mitad del ancho disponible (- gap) y el .phone-mockup
-       interno usa width:100% para llenarlo, manteniendo aspect-ratio 9/19.5. */
+       Cada item ocupa la mitad del ancho (- gap) y el .phone-mockup usa
+       width:100%. La altura la sigue marcando el aspect-ratio de la pantalla,
+       así que el encaje se mantiene perfecto a cualquier tamaño. */
     .phones-wrap {
       gap: 14px;
       flex-wrap: nowrap;
@@ -1455,10 +1461,10 @@
     }
     .phone-mockup {
       width: 100%;
-      padding: 8px;
-      border-radius: 30px;
+      padding: 7px;
+      border-radius: 32px;
     }
-    .phone-screen { border-radius: 22px; }
+    .phone-screen { border-radius: 25px; }   /* 32 − 7 = concéntrico */
     .phone-caption { font-size: 11px; }
     .bento { grid-template-columns: 1fr; }
     .qa-grid { grid-template-columns: 1fr; }

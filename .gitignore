@@ -26,3 +26,6 @@ yarn-error.log
 *.csv
 *.numbers
 *.rtf
+
+# Claude Code local tooling (preview launch config, etc.)
+.claude/
