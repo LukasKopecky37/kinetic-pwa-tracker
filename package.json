@@ -1,13 +1,14 @@
 {
   "name": "kinetic-pwa-tracker",
   "private": true,
-  "description": "Kinetic — static vanilla-JS PWA in /app (no build step). Root deps: web-push for the Vercel /api push functions. devDeps: Capacitor for the optional native iOS wrapper (see NATIVE-HEALTHKIT-SETUP.md). The HealthKit plugin is installed separately so npm negotiates a version compatible with the installed Capacitor. These are NOT needed by the web deploy.",
+  "description": "Kinetic — static vanilla-JS PWA in /app (no build step). Root deps: web-push for the Vercel /api push functions. devDeps: Capacitor 8 + capacitor-health for the optional native iOS wrapper (see NATIVE-HEALTHKIT-SETUP.md). NOT needed by the web deploy.",
   "dependencies": {
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2"
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "capacitor-health": "^8.0.0"
   }
 }

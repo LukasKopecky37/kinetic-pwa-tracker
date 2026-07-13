@@ -76,6 +76,6 @@ npx cap copy ios     # (o `npx cap sync ios` si cambian plugins/deps)
 - Las notificaciones push (`/api/*` en Vercel) NO funcionan dentro del
   contenedor nativo (usan el origen web); el temporizador de descanso en primer
   plano sí. Es independiente de HealthKit.
-- El plugin usado es `@perfood/capacitor-healthkit`, accedido en runtime por
-  `window.Capacitor.Plugins.CapacitorHealthkit` (sin bundler, respetando el
+- El plugin usado es `capacitor-health` (compatible con Capacitor 8), accedido
+  en runtime por `window.Capacitor.Plugins.Health` (sin bundler, respetando el
   "cero build step" de la web). Todo el HealthKit vive en `app/js/services/health.js`.

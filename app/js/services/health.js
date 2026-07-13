@@ -1,19 +1,19 @@
 /**
- * health.js — servicio de datos biométricos (Apple HealthKit vía Capacitor).
+ * health.js — datos biométricos (Apple HealthKit) vía el plugin nativo
+ * `capacitor-health` (compatible con Capacitor 8). Toda la lógica de salud
+ * vive aquí; la UI solo llama a `captureWorkoutEnergy()` /
+ * `isNativeHealthAvailable()`.
  *
- * SEPARACIÓN LIMPIA: aquí vive TODA la lógica de HealthKit; la UI solo llama
- * a `captureWorkoutEnergy()` / `isNativeHealthAvailable()`. No hay ningún
- * `import` del plugin (no hay bundler en la web) — accedemos al plugin por el
- * global que Capacitor inyecta en runtime dentro del contenedor nativo:
- *   window.Capacitor.Plugins.CapacitorHealthkit
+ * Sin bundler: accedemos al plugin por el global que Capacitor inyecta en
+ * runtime dentro del contenedor nativo → window.Capacitor.Plugins.Health.
+ * En la PWA web (sin contenedor) todo degrada a null sin romper nada; la UI
+ * ofrece entrada manual como respaldo.
  *
- * En la PWA web (sin contenedor nativo) todo degrada a null sin romper nada,
- * y la UI ofrece entrada manual como respaldo.
- *
- * Plugin usado: @perfood/capacitor-healthkit
- *   - requestAuthorization({ all, read, write })
- *   - queryHKitSampleType({ sampleName, startDate, endDate, limit })
- *       → { countReturn, resultData: [{ value, unitName, startDate, endDate }] }
+ * API de `capacitor-health` usada:
+ *   - requestHealthPermissions({ permissions: ['READ_ACTIVE_CALORIES'] })
+ *   - queryAggregated({ startDate, endDate, dataType:'active-calories', bucket:'day' })
+ *       → { aggregatedData: [{ startDate, endDate, value }] }
+ *   (value en kcal)
  *
  * Requisitos nativos (ver NATIVE-HEALTHKIT-SETUP.md):
  *   - Info.plist: NSHealthShareUsageDescription
@@ -21,15 +21,15 @@
  *   - Probar SIEMPRE en iPhone real (HealthKit no da datos en el simulador)
  */
 
-const READ_TYPES = ['activeEnergyBurned'];
+const READ_PERMS = ['READ_ACTIVE_CALORIES'];
 
-/** Devuelve el plugin de HealthKit si corremos DENTRO del contenedor nativo. */
+/** Devuelve el plugin Health si corremos DENTRO del contenedor nativo. */
 function nativePlugin() {
   const cap = (typeof window !== 'undefined') ? window.Capacitor : null;
   if (!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) {
     return null;
   }
-  return (cap.Plugins && cap.Plugins.CapacitorHealthkit) || null;
+  return (cap.Plugins && cap.Plugins.Health) || null;
 }
 
 /** ¿Hay HealthKit nativo disponible (app envuelta en Capacitor en iOS)? */
@@ -40,8 +40,8 @@ export function isNativeHealthAvailable() {
 let _authOk = null; // null=sin pedir · true/false=resultado cacheado
 
 /**
- * Pide permiso de LECTURA de energía activa. Debe llamarse desde un gesto de
- * usuario la primera vez (iOS muestra la hoja de permisos de Salud).
+ * Pide permiso de LECTURA de calorías activas. Debe llamarse desde un gesto
+ * de usuario la primera vez (iOS muestra la hoja de permisos de Salud).
  * @returns {Promise<boolean>}
  */
 export async function requestHealthPermission() {
@@ -49,11 +49,11 @@ export async function requestHealthPermission() {
   if (!hk) return false;
   if (_authOk === true) return true;
   try {
-    await hk.requestAuthorization({ all: [], read: READ_TYPES, write: [] });
+    await hk.requestHealthPermissions({ permissions: READ_PERMS });
     _authOk = true;
     return true;
   } catch (err) {
-    console.warn('[health] requestAuthorization falló:', err);
+    console.warn('[health] requestHealthPermissions falló:', err);
     _authOk = false;
     return false;
   }
@@ -74,19 +74,19 @@ export async function activeEnergyBetween(startISO, endISO) {
       const ok = await requestHealthPermission();
       if (!ok) return null;
     }
-    const res = await hk.queryHKitSampleType({
-      sampleName: 'activeEnergyBurned',
+    const res = await hk.queryAggregated({
       startDate: startISO,
       endDate: endISO,
-      limit: 0,                 // 0 = sin límite → todas las muestras del rango
+      dataType: 'active-calories',
+      bucket: 'day',            // el rango cae en un día → una sola cubeta = suma del rango
     });
-    const rows = (res && res.resultData) || [];
+    const rows = (res && res.aggregatedData) || [];
     let kcal = 0;
-    for (const s of rows) kcal += (+s.value || 0);
+    for (const r of rows) kcal += (+r.value || 0);
     if (!(kcal > 0)) return null;
     return Math.round(kcal);
   } catch (err) {
-    console.warn('[health] queryHKitSampleType falló:', err);
+    console.warn('[health] queryAggregated falló:', err);
     return null;
   }
 }
