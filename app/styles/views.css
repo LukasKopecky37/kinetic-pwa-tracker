@@ -1892,3 +1892,23 @@
 .mood-corr-text{ font-size:13px; color:var(--text); line-height:1.45; }
 .mood-corr-text b{ color:var(--accent-2); }
 .mood-corr-vs{ color:var(--muted); }
+
+/* ----- Chip de decisión de progresión (⬆/=/⬇) · Progreso + resumen ----- */
+.prog-chip{
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; font-weight:800; letter-spacing:.2px;
+  padding:3px 9px; border-radius:999px; border:1px solid transparent;
+  white-space:nowrap; line-height:1.2;
+}
+.prog-chip .pc-icon{ font-size:11px; }
+.prog-chip .pc-manual{ font-size:10px; margin-left:1px; opacity:.85; }
+.prog-chip.up{   color:var(--good);     background:var(--good-bg);      border-color:var(--good-border); }
+.prog-chip.hold{ color:var(--muted);    background:var(--neutral-bg);   border-color:var(--line); }
+.prog-chip.down{ color:var(--accent-2); background:rgba(255,164,92,.10); border-color:rgba(255,164,92,.38); }
+
+/* Progreso · fila de sugerencia con el chip + peso resultante */
+.suggestion-dec{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.suggestion-dec .sug-next{ font-size:12px; color:var(--accent-2); font-variant-numeric:tabular-nums; }
+
+/* Resumen post-entreno · chip bajo el detalle del ejercicio */
+.sx-decision{ margin-top:6px; }

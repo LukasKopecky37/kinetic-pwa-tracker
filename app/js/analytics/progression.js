@@ -271,6 +271,46 @@ export function suggestNextWeight(sessions, repRange, targetSets, exercise) {
   return evalRes.nextWeight;
 }
 
+/**
+ * Decisión de progresión de UNA sesión (para pintar el chip). No cambia
+ * ninguna lógica: solo EMPAQUETA lo que ya decide el motor + honra el
+ * override manual del usuario (▲=▼) por encima del automático.
+ *
+ * @returns {null | {
+ *   decision: 'up'|'hold'|'down',
+ *   baseline: number,
+ *   nextWeight: number,
+ *   deltaKg: number,          // nextWeight − baseline (con signo)
+ *   source: 'auto'|'manual',
+ *   type: 'standard'|'assisted'|'bodyweight'
+ * }}
+ */
+export function decisionFromSession(session, repRange, targetSets, exercise) {
+  const ev = evaluateProgression(session, repRange, targetSets, exercise);
+  if (ev.baseline == null) return null;
+  const type = progressionTypeOf(exercise);
+  const bump = bumpKgFor(exercise);
+  const base = ev.baseline;
+
+  let decision = ev.decision, source = 'auto', nextWeight = ev.nextWeight;
+  const ov = session?.nextOverride;
+  if (ov === 'up')        { decision = 'up';   source = 'manual'; nextWeight = applyBump(base, bump, type); }
+  else if (ov === 'down') { decision = 'down'; source = 'manual'; nextWeight = applyRegression(base, bump, type); }
+  else if (ov === 'flat') { decision = 'hold'; source = 'manual'; nextWeight = base; }
+
+  return {
+    decision, baseline: base, nextWeight,
+    deltaKg: Math.round((nextWeight - base) * 10) / 10,
+    source, type,
+  };
+}
+
+/** Decisión basada en el HISTÓRICO (usa la última sesión). Para Progreso. */
+export function decisionFromHistory(sessions, repRange, targetSets, exercise) {
+  if (!sessions?.length) return null;
+  return decisionFromSession(sessions[sessions.length - 1], repRange, targetSets, exercise);
+}
+
 /* Compat: `workingSets` se mantiene exportada (tests ad-hoc). Devuelve las
    series al peso de trabajo resuelto. */
 export function workingSets(session, exercise, repRange) {

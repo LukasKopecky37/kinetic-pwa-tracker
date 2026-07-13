@@ -20,7 +20,8 @@ import { ReadinessSliders } from '../components/ReadinessSliders.js';
 import { StatsCard } from '../components/StatsCard.js';
 import { muscleSVG } from '../components/muscle-map.js';
 import { summarizeWorkout, fmtDuration } from '../analytics/workout-summary.js';
-import { metTargetStrict, bumpKgFor } from '../analytics/progression.js';
+import { metTargetStrict, bumpKgFor, decisionFromSession } from '../analytics/progression.js';
+import { DecisionChip } from '../components/DecisionChip.js';
 import { fireConfetti } from '../services/confetti.js';
 import { vibrate } from '../services/haptics.js';
 import { App } from '../app.js';
@@ -209,6 +210,21 @@ export function openWorkoutSummary(workoutId) {
           const sets = (item.session.sets || []).filter(s => !s.warmup && s.reps);
           const repsStr = sets.map(s => s.reps).join('·') || '—';
           const topW = item.topSet ? item.topSet.weight : 0;
+
+          // Chip de decisión de progresión (⬆/=/⬇) — solo lo muestra, no cambia
+          // nada. Rango efectivo: targetRepRange del ejercicio → item de rutina
+          // → '8-12'. targetSets: el del día o el nº de series reales.
+          const rItem = routine
+            ? routine.items.find(it => it.exerciseId === item.session.exerciseId)
+            : null;
+          const range = (item.ex.targetRepRange
+                         && Number.isFinite(item.ex.targetRepRange.min)
+                         && Number.isFinite(item.ex.targetRepRange.max))
+            ? `${item.ex.targetRepRange.min}-${item.ex.targetRepRange.max}`
+            : (rItem?.repRange || '8-12');
+          const tSets = rItem?.sets || sets.length || 3;
+          const dec = decisionFromSession(item.session, range, tSets, item.ex);
+
           return h('div', { class: 'summary-ex-row' },
             h('div', null,
               h('div', { class: 'sx-name' },
@@ -217,6 +233,7 @@ export function openWorkoutSummary(workoutId) {
               ),
               h('div', { class: 'sx-detail' },
                 repsStr, ` · ${item.volume} kg·rep`),
+              dec ? h('div', { class: 'sx-decision' }, DecisionChip(dec)) : null,
             ),
             h('div', { class: 'sx-weight' }, `${topW} kg`),
           );

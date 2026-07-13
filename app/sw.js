@@ -14,7 +14,7 @@
  * descargar la nueva shell. Al activar, las caches antiguas se borran.
  */
 
-const CACHE_VERSION = 'rutina-v64';
+const CACHE_VERSION = 'rutina-v65';
 
 // Lista del shell (rutas relativas a la raíz del servidor que sirve la app).
 const SHELL = [
@@ -84,6 +84,7 @@ const SHELL = [
   './js/components/RoutineButton.js',
   './js/components/ReadinessSliders.js',
   './js/components/InsightCard.js',
+  './js/components/DecisionChip.js',
 
   './js/views/home.js',
   './js/views/routine.js',

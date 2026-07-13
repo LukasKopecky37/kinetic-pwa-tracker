@@ -16,6 +16,8 @@ import { renderProgressChart } from '../charts/progress.js';
 import { renderExerciseVolumeChart } from '../charts/exercise-volume.js';
 import { StatsCard } from '../components/StatsCard.js';
 import { openTipsModal } from '../services/tips-modal.js';
+import { decisionFromHistory } from '../analytics/progression.js';
+import { DecisionChip } from '../components/DecisionChip.js';
 
 let chart = null;       // A · fuerza (top set)
 let chartVol = null;    // B · volumen total por sesión
@@ -67,13 +69,25 @@ export function renderProgress() {
     ? `${ex.targetRepRange.min}-${ex.targetRepRange.max}`
     : '8-12';
   const lastWorkCount = (last.sets || []).filter(s => !s.warmup && s.reps > 0).length || 3;
-  const sug = Store.suggestWeight(exId, exRange, lastWorkCount);
-  const stalledTxt = stalled
-    ? '<div class="suggestion" style="background:var(--warn-bg);border-color:var(--warn);color:#fde68a"><span>⚠ Posible estancamiento. Considera <b>descarga</b> o cambio de variante.</span></div>'
-    : '';
-  sugBox.innerHTML = stalledTxt + (sug && !stalled
-    ? `<div class="suggestion"><span>Próxima sesión sugerida: <b>${sug} kg</b></span></div>`
-    : '');
+  const dec = decisionFromHistory(sessions, exRange, lastWorkCount, ex);
+
+  const sugKids = [];
+  if (stalled) {
+    sugKids.push(h('div', {
+      class: 'suggestion',
+      style: 'background:var(--warn-bg);border-color:var(--warn);color:#fde68a',
+    }, h('span', null, '⚠ Posible estancamiento. Considera descarga o cambio de variante.')));
+  } else if (dec) {
+    // Chip de decisión del motor + peso resultante de la próxima sesión.
+    const nextTxt = dec.type === 'bodyweight'
+      ? 'mismo peso corporal'
+      : `próxima: ${dec.nextWeight} kg`;
+    sugKids.push(h('div', { class: 'suggestion suggestion-dec' },
+      DecisionChip(dec),
+      h('span', { class: 'sug-next' }, nextTxt),
+    ));
+  }
+  mount(sugBox, sugKids);
 
   if (chart)    chart.destroy();
   if (chartVol) chartVol.destroy();
