@@ -472,11 +472,20 @@ export const Store = {
     return w;
   },
 
-  /** Termina un workout (sello de hora fin) y lo desactiva. */
+  /** Termina un workout (sello de hora fin) y lo desactiva.
+   *  Guarda ADEMÁS `durationSec` explícito en el payload (además de
+   *  start/endAt) para que las analíticas de duración no dependan de
+   *  recomputar y sean robustas ante datos migrados. `readiness.energy`
+   *  (marcado al iniciar) es el "mood pre-workout" que consumen las
+   *  analíticas de estado de ánimo. */
   finishWorkout(id) {
     const w = this.workoutById(id || this.data.activeWorkoutId);
     if (!w) return null;
     w.endAt = new Date().toISOString();
+    if (w.startAt) {
+      w.durationSec = Math.max(0,
+        Math.floor((new Date(w.endAt) - new Date(w.startAt)) / 1000));
+    }
     if (this.data.activeWorkoutId === w.id) this.data.activeWorkoutId = null;
     this.save();
     emit('workout:finished', w);

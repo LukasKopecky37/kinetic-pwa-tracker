@@ -15,14 +15,19 @@ import { $, h, mount } from '../utils/dom.js';
 import { escapeH } from '../utils/format.js';
 import { Store } from '../store/store.js';
 import { renderVolumeChart } from '../charts/volume.js';
+import { renderDurationChart } from '../charts/workout-duration.js';
 import { muscleSVG, updateMuscleHeatmap } from '../components/muscle-map.js';
 import {
   calculateMuscleVolume, normalizeMuscleVolume, regionIntensities,
 } from '../analytics/muscle-load.js';
 import { bestEstimated1RM } from '../analytics/one-rm.js';
 import { sessionVolume, sessionSetCount, weeklyMetrics } from '../analytics/volume.js';
+import { weeklyDurationMinutes, moodByDate, energyPRCorrelation } from '../analytics/workout-metrics.js';
 
 let volChart = null;
+let durChart = null;
+
+const ENERGY_LABELS = ['', 'ninguna', 'poca', 'normal', 'alta', 'máxima'];
 
 const HEATMAP_DAYS = 30;
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -46,10 +51,107 @@ export function renderAnalysis() {
     cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   }
 
+  // Duración de entrenamiento (minutos por semana)
+  renderDurationSection();
+
+  // Energía pre-entreno (últimos 30 días) + cruce con PRs
+  renderMoodSection();
+
   renderMuscleHeatmap();
 
   // Frecuencia de entrenamiento (adherencia 12 sem, alineada lunes-domingo)
   renderAdherence();
+}
+
+/* ============================================================================
+   Duración de entrenamiento · minutos totales por semana (barras)
+   ============================================================================ */
+function renderDurationSection() {
+  const weekly = weeklyDurationMinutes(Store.data.workouts || [], 10);
+  const hasData = weekly.some(w => w.minutes > 0);
+  const canvas = $('#durCanvas');
+  const empty  = $('#durEmpty');
+  const wrap   = $('#durChart');
+
+  if (durChart) { durChart.destroy(); durChart = null; }
+
+  if (!hasData) {
+    if (wrap)  wrap.hidden = true;
+    if (empty) empty.hidden = false;
+    return;
+  }
+  if (wrap)  wrap.hidden = false;
+  if (empty) empty.hidden = true;
+  durChart = renderDurationChart(canvas, weekly);
+}
+
+/* ============================================================================
+   Energía pre-entreno · tira de 30 días + correlación energía↔PR (Pro)
+   ----------------------------------------------------------------------------
+   Lee `workout.readiness.energy` (1..5) marcada al iniciar. La correlación
+   cruza "energía alta (≥4)" con si ese entreno produjo ≥1 récord personal.
+   ============================================================================ */
+function renderMoodSection() {
+  const host = $('#moodCard');
+  if (!host) return;
+
+  const workouts = Store.data.workouts || [];
+  const mood = moodByDate(workouts, 30);
+
+  if (mood.size === 0) {
+    mount(host, h('div', { class: 'mood-empty' },
+      'Marca tu nivel de energía al iniciar un entrenamiento (encuesta pre-workout) y verás aquí tu historial de estado de ánimo.'));
+    return;
+  }
+
+  // Tira de 30 días (más antiguo → más reciente). Días sin entreno = vacío.
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const cells = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    const e = mood.get(iso);
+    const title = e
+      ? `${iso} · energía ${e}/5 (${ENERGY_LABELS[e]})`
+      : `${iso} · sin entreno`;
+    cells.push(h('div', {
+      class: 'mood-day' + (e ? ' e' + e : ' empty'),
+      title,
+    }));
+  }
+
+  // Correlación energía↔PR
+  const corr = energyPRCorrelation(workouts, hadPR);
+  let corrEl = null;
+  if (corr.enough) {
+    const better = corr.highPct != null && corr.lowPct != null && corr.highPct > corr.lowPct;
+    corrEl = h('div', { class: 'mood-corr' + (better ? ' good' : '') },
+      h('span', { class: 'mood-corr-icon', 'aria-hidden': 'true' }, better ? '⚡' : '📊'),
+      h('div', { class: 'mood-corr-text' },
+        'Con energía alta (4–5): ',
+        h('b', null, `${corr.highPct}%`),
+        ' de tus entrenos acabaron en PR',
+        h('span', { class: 'mood-corr-vs' }, ` · el resto: ${corr.lowPct}%`),
+      ),
+    );
+  }
+
+  mount(host, [
+    h('div', { class: 'mood-strip' }, ...cells),
+    h('div', { class: 'mood-legend' },
+      h('span', null, 'baja'),
+      h('i', { class: 'e1' }), h('i', { class: 'e2' }), h('i', { class: 'e3' }),
+      h('i', { class: 'e4' }), h('i', { class: 'e5' }),
+      h('span', null, 'alta'),
+    ),
+    corrEl,
+  ].filter(Boolean));
+}
+
+/** ¿El workout produjo ≥1 récord personal? (cualquiera de sus sesiones). */
+function hadPR(workout) {
+  const sess = Store.sessionsOfWorkout(workout.id);
+  return sess.some(s => Store.isPR(s));
 }
 
 function renderAdherence() {

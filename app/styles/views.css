@@ -1852,3 +1852,43 @@
 .pg-tips-empty{
   font-size:13px; color:var(--muted); line-height:1.5;
 }
+
+/* ----- Análisis · duración vacía + energía pre-entreno ----- */
+.an-empty{
+  font-size:13px; color:var(--muted); line-height:1.5;
+  padding:14px 16px; margin-bottom:8px;
+  background:var(--panel-2); border:1px dashed var(--line); border-radius:12px;
+}
+.mood-card{
+  background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--radius); padding:14px; margin-bottom:8px;
+}
+.mood-empty{ font-size:13px; color:var(--muted); line-height:1.5; }
+.mood-strip{ display:flex; flex-wrap:wrap; gap:5px; }
+.mood-day{
+  width:16px; height:16px; border-radius:5px;
+  background:var(--neutral-bg); border:1px solid var(--line);
+}
+.mood-day.empty{ opacity:.4; }
+/* Rampa de energía 1..5 (terracotta → ámbar → verde). Rojo = terracotta
+   (#c0554f) por coherencia con la regla de marca (nunca coral). */
+.mood-day.e1,.mood-legend i.e1{ background:#c0554f; border-color:#c0554f; }
+.mood-day.e2,.mood-legend i.e2{ background:#d97a43; border-color:#d97a43; }
+.mood-day.e3,.mood-legend i.e3{ background:#e0a33a; border-color:#e0a33a; }
+.mood-day.e4,.mood-legend i.e4{ background:#8cbf3f; border-color:#8cbf3f; }
+.mood-day.e5,.mood-legend i.e5{ background:#43b25a; border-color:#43b25a; }
+.mood-legend{
+  display:flex; align-items:center; gap:5px; margin-top:12px;
+  font-size:11px; color:var(--muted);
+}
+.mood-legend i{ width:14px; height:14px; border-radius:4px; display:inline-block; }
+.mood-corr{
+  display:flex; gap:10px; align-items:flex-start;
+  margin-top:14px; padding:10px 12px; border-radius:10px;
+  background:var(--neutral-bg); border:1px solid var(--line);
+}
+.mood-corr.good{ background:var(--accent-bg); border-color:rgba(255,107,0,.3); }
+.mood-corr-icon{ font-size:18px; line-height:1.2; }
+.mood-corr-text{ font-size:13px; color:var(--text); line-height:1.45; }
+.mood-corr-text b{ color:var(--accent-2); }
+.mood-corr-vs{ color:var(--muted); }

@@ -14,7 +14,7 @@
  * descargar la nueva shell. Al activar, las caches antiguas se borran.
  */
 
-const CACHE_VERSION = 'rutina-v63';
+const CACHE_VERSION = 'rutina-v64';
 
 // Lista del shell (rutas relativas a la raíz del servidor que sirve la app).
 const SHELL = [
@@ -70,11 +70,13 @@ const SHELL = [
   './js/analytics/streak.js',
   './js/analytics/muscle-load.js',
   './js/analytics/insights.js',
+  './js/analytics/workout-metrics.js',
 
   './js/charts/theme.js',
   './js/charts/progress.js',
   './js/charts/volume.js',
   './js/charts/exercise-volume.js',
+  './js/charts/workout-duration.js',
 
   './js/components/muscle-map.js',
   './js/components/HistoryChip.js',
