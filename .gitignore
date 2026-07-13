@@ -34,3 +34,6 @@ yarn-error.log
 ios/
 .gradle/
 android/
+
+# npm lockfile generado localmente (proyecto web sin build; Capacitor a mano)
+package-lock.json
