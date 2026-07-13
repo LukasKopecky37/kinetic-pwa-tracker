@@ -1,0 +1,11 @@
+{
+  "appId": "com.lukaskopecky.kinetic",
+  "appName": "Kinetic",
+  "webDir": "app",
+  "server": {
+    "iosScheme": "capacitor"
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

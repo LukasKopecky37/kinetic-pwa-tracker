@@ -1,8 +1,14 @@
 {
-  "name": "kinetic-push-api",
+  "name": "kinetic-pwa-tracker",
   "private": true,
-  "description": "Vercel serverless functions for Kinetic rest-timer Web Push (VAPID + QStash delay). The static PWA in /app has NO build step; this package.json only exists so Vercel installs web-push for the /api functions.",
+  "description": "Kinetic — static vanilla-JS PWA in /app (no build step). Root deps: web-push for the Vercel /api push functions. devDeps: Capacitor + HealthKit for the optional native iOS wrapper (see NATIVE-HEALTHKIT-SETUP.md); these are NOT needed by the web deploy.",
   "dependencies": {
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
+    "@perfood/capacitor-healthkit": "^1.0.0"
   }
 }

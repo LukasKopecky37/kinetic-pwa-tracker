@@ -22,7 +22,7 @@ import {
 } from '../analytics/muscle-load.js';
 import { bestEstimated1RM } from '../analytics/one-rm.js';
 import { sessionVolume, sessionSetCount, weeklyMetrics } from '../analytics/volume.js';
-import { weeklyDurationMinutes, moodByDate, energyPRCorrelation } from '../analytics/workout-metrics.js';
+import { weeklyDurationMinutes, moodByDate, energyPRCorrelation, totalActiveKcal } from '../analytics/workout-metrics.js';
 
 let volChart = null;
 let durChart = null;
@@ -54,6 +54,9 @@ export function renderAnalysis() {
   // Duración de entrenamiento (minutos por semana)
   renderDurationSection();
 
+  // Energía activa (kcal · Apple Watch / HealthKit)
+  renderKcalStat();
+
   // Energía pre-entreno (últimos 30 días) + cruce con PRs
   renderMoodSection();
 
@@ -83,6 +86,34 @@ function renderDurationSection() {
   if (wrap)  wrap.hidden = false;
   if (empty) empty.hidden = true;
   durChart = renderDurationChart(canvas, weekly);
+}
+
+/* ============================================================================
+   Energía activa · kcal reales del Apple Watch (HealthKit)
+   ============================================================================ */
+function renderKcalStat() {
+  const host = $('#kcalStat');
+  if (!host) return;
+  const workouts = Store.data.workouts || [];
+  const wk = totalActiveKcal(workouts, 7);
+  const mo = totalActiveKcal(workouts, 30);
+
+  // Sin ningún kcal registrado → no metemos ruido (la sección aparece sola
+  // cuando empiezan a entrar datos del Watch o entradas manuales).
+  if (mo.count === 0) { host.innerHTML = ''; return; }
+
+  mount(host, h('div', { class: 'kcal-stat' },
+    h('span', { class: 'ks-flame', 'aria-hidden': 'true' }, '🔥'),
+    h('div', { class: 'ks-main' },
+      h('div', { class: 'ks-val' },
+        wk.total.toLocaleString('es-ES'),
+        h('span', { class: 'ks-unit' }, ' kcal · 7 días'),
+      ),
+      h('div', { class: 'ks-sub' },
+        `${mo.total.toLocaleString('es-ES')} kcal en 30 días`
+        + (mo.avg ? ` · ${mo.avg} kcal/entreno` : '')),
+    ),
+  ));
 }
 
 /* ============================================================================

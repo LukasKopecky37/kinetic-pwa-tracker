@@ -574,6 +574,19 @@ export const Store = {
     emit('workout:updated', w);
   },
 
+  /** Guarda las kcal activas (Apple Watch / HealthKit) del workout. Se refleja
+   *  también en las sesiones enlazadas para analítica por sesión. */
+  setWorkoutKcal(id, kcal) {
+    const w = this.workoutById(id);
+    if (!w) return;
+    const v = Math.round(+kcal);
+    if (!Number.isFinite(v) || v < 0) return;
+    w.activeKcal = v;
+    this.data.sessions.forEach(s => { if (s.workoutId === w.id) s.activeKcal = v; });
+    this.save();
+    emit('workout:updated', w);
+  },
+
   /* === Settings === */
   setLastRoutine(id)  { this.data.settings.lastRoutineId = id; this.save(); },
   getLastRoutine()    { return this.data.settings.lastRoutineId; },

@@ -22,6 +22,7 @@ import { muscleSVG } from '../components/muscle-map.js';
 import { summarizeWorkout, fmtDuration } from '../analytics/workout-summary.js';
 import { metTargetStrict, bumpKgFor, decisionFromSession } from '../analytics/progression.js';
 import { DecisionChip } from '../components/DecisionChip.js';
+import { isNativeHealthAvailable, captureWorkoutEnergy } from '../services/health.js';
 import { fireConfetti } from '../services/confetti.js';
 import { vibrate } from '../services/haptics.js';
 import { App } from '../app.js';
@@ -127,6 +128,82 @@ function pickCheerMessage() {
     if (r <= 0) return m.text;
   }
   return CHEER_MESSAGES[0].text;   // fallback (no debería caer aquí nunca)
+}
+
+/* ============================================================================
+   Fila de KCAL (energía activa · Apple Watch / HealthKit)
+   ----------------------------------------------------------------------------
+   Elemento auto-gestionado: se pinta en el hero del resumen y decide su
+   estado por sí mismo, sin bloquear el modal:
+     · Si el workout ya tiene `activeKcal` → "🔥 XXX kcal".
+     · Si hay HealthKit nativo (app Capacitor) → consulta la energía activa
+       del rango del workout, la guarda y actualiza el texto.
+     · Si no hay nativo (PWA web) → botón "＋ kcal" para entrada manual.
+   ============================================================================ */
+function buildKcalRow(workout) {
+  const row = h('div', { class: 'summary-kcal' });
+
+  const showValue = (kcal) => {
+    row.innerHTML = '';
+    row.classList.remove('loading', 'add');
+    row.append(
+      h('span', { class: 'sk-flame', 'aria-hidden': 'true' }, '🔥'),
+      h('b', { class: 'sk-val' }, String(kcal)),
+      h('span', { class: 'sk-unit' }, ' kcal'),
+      h('button', {
+        class: 'sk-edit', type: 'button', title: 'Editar kcal',
+        onClick: () => promptManual(kcal),
+      }, '✎'),
+    );
+  };
+
+  const showAdd = () => {
+    row.innerHTML = '';
+    row.classList.remove('loading');
+    row.classList.add('add');
+    row.append(h('button', {
+      class: 'sk-add', type: 'button',
+      onClick: () => promptManual(),
+    }, '🔥 Añadir kcal'));
+  };
+
+  const showLoading = () => {
+    row.innerHTML = '';
+    row.classList.add('loading');
+    row.append(h('span', { class: 'sk-flame', 'aria-hidden': 'true' }, '🔥'),
+               h('span', { class: 'sk-load' }, 'leyendo Apple Watch…'));
+  };
+
+  const promptManual = (current) => {
+    const raw = window.prompt('Kilocalorías activas (del Apple Watch):',
+      current != null ? String(current) : '');
+    if (raw == null) return;
+    const v = Math.round(parseFloat(String(raw).replace(',', '.')));
+    if (!Number.isFinite(v) || v < 0) { toast('Valor no válido', 'bad'); return; }
+    Store.setWorkoutKcal(workout.id, v);
+    showValue(v);
+  };
+
+  // Estado inicial.
+  if (Number.isFinite(+workout.activeKcal) && +workout.activeKcal > 0) {
+    showValue(+workout.activeKcal);
+  } else if (isNativeHealthAvailable()) {
+    showLoading();
+    captureWorkoutEnergy(workout)
+      .then((kcal) => {
+        if (kcal != null && kcal > 0) {
+          Store.setWorkoutKcal(workout.id, kcal);
+          showValue(kcal);
+        } else {
+          showAdd();   // sin datos o sin permiso → deja añadir a mano
+        }
+      })
+      .catch(() => showAdd());
+  } else {
+    showAdd();
+  }
+
+  return row;
 }
 
 export function openWorkoutSummary(workoutId) {
@@ -261,6 +338,7 @@ export function openWorkoutSummary(workoutId) {
       h('div', { class: 'summary-hero' },
         cheerEl,
         h('div', { class: 'duration' }, fmtDuration(summary.durationSec)),
+        buildKcalRow(w),
         h('div', { class: 'sub' }, heroSub),
       ),
       h('div', { class: 'summary-stats' },

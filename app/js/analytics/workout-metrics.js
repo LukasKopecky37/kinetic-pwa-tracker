@@ -86,6 +86,24 @@ export function moodByDate(workouts, days = 30) {
 }
 
 /**
+ * Suma de energía ACTIVA (kcal) de los workouts en los últimos `days` días.
+ * @returns {{ total:number, count:number, avg:number|null }}
+ */
+export function totalActiveKcal(workouts, days = 7) {
+  const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  const cutISO = cutoff.toISOString().slice(0, 10);
+  let sum = 0, n = 0;
+  for (const w of (workouts || [])) {
+    const k = +w?.activeKcal;
+    if (!Number.isFinite(k) || k <= 0) continue;
+    if (w.date && w.date < cutISO) continue;
+    sum += k; n++;
+  }
+  return { total: Math.round(sum), count: n, avg: n ? Math.round(sum / n) : null };
+}
+
+/**
  * Correlación energía↔PR (feature Pro). Recibe los workouts y un predicado
  * `hadPR(workout)` que dice si ese workout produjo ≥1 récord personal.
  * Devuelve el % de workouts que acabaron en PR partiendo de energía ALTA

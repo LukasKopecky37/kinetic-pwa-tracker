@@ -1912,3 +1912,36 @@
 
 /* Resumen post-entreno · chip bajo el detalle del ejercicio */
 .sx-decision{ margin-top:6px; }
+
+/* ----- Energía activa (kcal · Apple Watch) ----- */
+/* Resumen post-entreno · fila bajo la duración */
+.summary-kcal{
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  margin-top:6px; min-height:24px; font-variant-numeric:tabular-nums;
+}
+.summary-kcal .sk-flame{ font-size:15px; }
+.summary-kcal .sk-val{ font-size:18px; font-weight:800; color:var(--accent); }
+.summary-kcal .sk-unit{ font-size:13px; color:var(--muted); }
+.summary-kcal .sk-load{ font-size:12px; color:var(--muted); }
+.summary-kcal .sk-edit{
+  background:transparent; border:0; color:var(--muted); cursor:pointer;
+  font-size:12px; padding:2px 4px; margin-left:2px;
+}
+.summary-kcal .sk-add{
+  background:var(--accent-bg); border:1px solid rgba(255,107,0,.35);
+  color:var(--accent-2); cursor:pointer;
+  font-size:12px; font-weight:700; padding:5px 13px; border-radius:999px;
+}
+.summary-kcal .sk-add:active{ transform:scale(.97); }
+
+/* Análisis · tarjeta de energía activa */
+.kcal-stat{
+  display:flex; align-items:center; gap:12px;
+  background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--radius); padding:12px 14px; margin-bottom:8px;
+}
+.kcal-stat .ks-flame{ font-size:24px; flex-shrink:0; }
+.kcal-stat .ks-main{ min-width:0; }
+.kcal-stat .ks-val{ font-size:20px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; }
+.kcal-stat .ks-unit{ font-size:12px; font-weight:600; color:var(--muted); }
+.kcal-stat .ks-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
