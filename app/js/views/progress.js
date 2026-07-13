@@ -59,7 +59,15 @@ export function renderProgress() {
     StatsCard({ label: 'Pos. media', value: avgPos != null ? roman(Math.round(avgPos)) : '—' }),
   ]);
 
-  const sug = Store.suggestWeight(exId, '8-12');
+  // Rango + nº de series REALES para que el motor evalúe up/hold/down bien
+  // (antes iba con '8-12' fijo y sin targetSets → sugerencia genérica).
+  const exRange = (ex.targetRepRange
+                   && Number.isFinite(ex.targetRepRange.min)
+                   && Number.isFinite(ex.targetRepRange.max))
+    ? `${ex.targetRepRange.min}-${ex.targetRepRange.max}`
+    : '8-12';
+  const lastWorkCount = (last.sets || []).filter(s => !s.warmup && s.reps > 0).length || 3;
+  const sug = Store.suggestWeight(exId, exRange, lastWorkCount);
   const stalledTxt = stalled
     ? '<div class="suggestion" style="background:var(--warn-bg);border-color:var(--warn);color:#fde68a"><span>⚠ Posible estancamiento. Considera <b>descarga</b> o cambio de variante.</span></div>'
     : '';
