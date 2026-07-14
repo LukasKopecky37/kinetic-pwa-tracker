@@ -5,7 +5,9 @@
  * `isNativeHealthAvailable()`.
  *
  * Sin bundler: accedemos al plugin por el global que Capacitor inyecta en
- * runtime dentro del contenedor nativo → window.Capacitor.Plugins.Health.
+ * runtime dentro del contenedor nativo. OJO: `capacitor-health` registra el
+ * plugin con el nombre 'HealthPlugin' (aunque su export JS se llame `Health`),
+ * así que en runtime es window.Capacitor.Plugins.HealthPlugin.
  * En la PWA web (sin contenedor) todo degrada a null sin romper nada; la UI
  * ofrece entrada manual como respaldo.
  *
@@ -29,7 +31,11 @@ function nativePlugin() {
   if (!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) {
     return null;
   }
-  return (cap.Plugins && cap.Plugins.Health) || null;
+  // `capacitor-health` se registra como 'HealthPlugin' (su export JS `Health`
+  // es solo un alias del proxy). En runtime, por tanto, el global correcto es
+  // cap.Plugins.HealthPlugin. Dejamos `.Health` como respaldo por si un día
+  // renombran el registro.
+  return (cap.Plugins && (cap.Plugins.HealthPlugin || cap.Plugins.Health)) || null;
 }
 
 /** ¿Hay HealthKit nativo disponible (app envuelta en Capacitor en iOS)? */

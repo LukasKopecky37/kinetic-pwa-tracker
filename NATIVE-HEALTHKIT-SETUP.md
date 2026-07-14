@@ -77,5 +77,6 @@ npx cap copy ios     # (o `npx cap sync ios` si cambian plugins/deps)
   contenedor nativo (usan el origen web); el temporizador de descanso en primer
   plano sí. Es independiente de HealthKit.
 - El plugin usado es `capacitor-health` (compatible con Capacitor 8), accedido
-  en runtime por `window.Capacitor.Plugins.Health` (sin bundler, respetando el
-  "cero build step" de la web). Todo el HealthKit vive en `app/js/services/health.js`.
+  en runtime por `window.Capacitor.Plugins.HealthPlugin` (así lo registra el
+  plugin; sin bundler, respetando el "cero build step" de la web). Todo el
+  HealthKit vive en `app/js/services/health.js`.
