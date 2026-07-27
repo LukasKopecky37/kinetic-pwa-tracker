@@ -14,15 +14,22 @@
    los overrides también van con ID. */
 .subview { display: none; }
 .subview.active { display: block; }
-.subview.active { animation: subviewIn 280ms cubic-bezier(.2,.8,.2,1); }
+/* La animación se dispara SOLO con una clase transitoria (anim-in / anim-back)
+   que el JS QUITA al terminar (animationend + timeout de respaldo). Así el
+   estado EN REPOSO de .subview.active nunca lleva transform: si una animación
+   se congela (app en segundo plano, transición interrumpida) no queda un
+   desplazamiento pegado que empuje las tarjetas fuera de la pantalla.
+   Además el translate es en px ≤ el padding lateral (14px) para que el
+   contenido no asome por el borde ni siquiera durante la transición. */
+.subview.active.anim-in   { animation: subviewIn 280ms cubic-bezier(.2,.8,.2,1); }
+.subview.active.anim-back { animation: subviewBack 240ms cubic-bezier(.2,.8,.2,1); }
 @keyframes subviewIn {
-  from { opacity: 0; transform: translateX(8%); }
+  from { opacity: 0; transform: translateX(12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 /* Sentido contrario cuando volvemos atrás (a Home) */
-.subview.active.from-back { animation: subviewBack 240ms cubic-bezier(.2,.8,.2,1); }
 @keyframes subviewBack {
-  from { opacity: 0; transform: translateX(-6%); }
+  from { opacity: 0; transform: translateX(-12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 

@@ -14,7 +14,7 @@
  * descargar la nueva shell. Al activar, las caches antiguas se borran.
  */
 
-const CACHE_VERSION = 'rutina-v69';
+const CACHE_VERSION = 'rutina-v70';
 
 // Lista del shell (rutas relativas a la raíz del servidor que sirve la app).
 const SHELL = [

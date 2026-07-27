@@ -24,6 +24,20 @@ import { renderAnalysis } from './views/analysis.js';
 import { renderBody }     from './views/body.js';
 import { openSettings }   from './views/settings.js';
 
+/**
+ * Quita la clase de animación (anim-in / anim-back) en cuanto la transición
+ * termina, para que el estado en reposo de la subvista NO conserve ningún
+ * transform. Sin esto, si la animación se congelaba (app en segundo plano o
+ * transición interrumpida) la vista quedaba desplazada ~20px a la izquierda y
+ * las tarjetas de día asomaban fuera de la pantalla. El `setTimeout` es el
+ * respaldo por si `animationend` no llega a dispararse.
+ */
+function clearSubviewAnim(el) {
+  const done = () => el.classList.remove('anim-in', 'anim-back');
+  el.addEventListener('animationend', done, { once: true });
+  setTimeout(done, 360);   // animación ≤280ms → respaldo holgado
+}
+
 export const App = {
   state: {
     currentRoutineId: null,
@@ -161,10 +175,11 @@ export const App = {
   showHome() {
     const home = $('#view-home');
     const rout = $('#view-routine');
-    rout.classList.remove('active');
-    home.classList.remove('active', 'from-back');
+    rout.classList.remove('active', 'anim-in', 'anim-back');
+    home.classList.remove('active', 'anim-in', 'anim-back');
     void home.offsetWidth;
-    home.classList.add('active', 'from-back');
+    home.classList.add('active', 'anim-back');
+    clearSubviewAnim(home);
     renderHome();
   },
 
@@ -201,10 +216,11 @@ export const App = {
 
     const home = $('#view-home');
     const rout = $('#view-routine');
-    home.classList.remove('active', 'from-back');
-    rout.classList.remove('active', 'from-back');
+    home.classList.remove('active', 'anim-in', 'anim-back');
+    rout.classList.remove('active', 'anim-in', 'anim-back');
     void rout.offsetWidth;
-    rout.classList.add('active');
+    rout.classList.add('active', 'anim-in');
+    clearSubviewAnim(rout);
     renderRoutine();
   },
 };
