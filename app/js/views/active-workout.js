@@ -302,8 +302,17 @@ function buildPage(item, pageIdx) {
                     && Number.isFinite(ex.targetRepRange.max))
     ? `${ex.targetRepRange.min}-${ex.targetRepRange.max}`
     : (item.repRange || '8-12');
+  // El motor SIGUE calculando su sugerencia, pero YA NO siembra la fila como
+  // valor editable. Antes `baseW = suggestedW` (último + incremento) se metía
+  // en la casilla y, al tocar ✓ sin corregirlo, se GUARDABA como serie real →
+  // el peso "subía solo" +2,5 cada semana y en mancuernas caía en pesos
+  // imposibles (8 → 10,5). Ahora la fila arranca con lo que REALMENTE hiciste
+  // (freshRow → lastSetForRow) y la sugerencia se muestra aparte, sin
+  // guardarse, como "objetivo" del día (goalChip). Subir de peso es una
+  // decisión consciente del usuario.
   const suggestedW = Store.suggestWeight(ex.id, _exRange, item.sets);
-  const baseW      = suggestedW || (lastTop ? lastTop.weight : '');
+  const lastTopW   = (lastTop && lastTop.weight != null) ? +lastTop.weight : null;
+  const baseW      = lastTop ? lastTop.weight : '';   // fallback: último peso REAL
   const targetReps = parseTargetReps(_exRange)
     || (lastTop ? lastTop.reps : '');
 
@@ -347,6 +356,24 @@ function buildPage(item, pageIdx) {
   //                            edita estos cuatro campos directamente; persist
   //                            sincroniza `weight = max(L,R)` y `reps = L+R`.
   //   rpe                    → opcional.
+  // Fila nueva (no completada) sembrada con lo que se hizo REALMENTE en esa
+  // misma serie la última vez — no la sugerencia. `lastSetForRow(i)` ya cae a
+  // la última serie registrada si hoy haces más series que la semana pasada.
+  // Si no hay histórico → peso vacío (baseW='') y reps en blanco: el usuario
+  // registra su primera marca. Así el ✓ guarda SIEMPRE la realidad.
+  function freshRow(i) {
+    const rl = lastSetForRow(i);
+    const w  = (rl && rl.weight != null && rl.weight !== '') ? rl.weight : baseW;
+    const rp = (rl && rl.reps   != null && rl.reps   !== '') ? rl.reps   : '';
+    const wL = (rl && rl.weightL != null && rl.weightL !== '') ? rl.weightL : w;
+    const wR = (rl && rl.weightR != null && rl.weightR !== '') ? rl.weightR : w;
+    return {
+      weight: w, reps: rp,
+      weightL: wL, weightR: wR,
+      repsL: '', repsR: '', rpe: '', done: false,
+    };
+  }
+
   let rows;
   if (todayDone && (todayDone.sets || []).length) {
     rows = todayDone.sets.map(s => ({
@@ -356,17 +383,9 @@ function buildPage(item, pageIdx) {
       repsL: s.repsL ?? '', repsR: s.repsR ?? '',
       rpe: s.rpe ?? '', done: true,
     }));
-    for (let i = rows.length; i < plannedN; i++) {
-      rows.push({ weight: baseW, reps: targetReps,
-                  weightL: baseW, weightR: baseW,
-                  repsL: '', repsR: '', rpe: '', done: false });
-    }
+    for (let i = rows.length; i < plannedN; i++) rows.push(freshRow(i));
   } else {
-    rows = Array.from({ length: plannedN }, () => ({
-      weight: baseW, reps: targetReps,
-      weightL: baseW, weightR: baseW,
-      repsL: '', repsR: '', rpe: '', done: false,
-    }));
+    rows = Array.from({ length: plannedN }, (_, i) => freshRow(i));
   }
 
   const state = {
@@ -449,6 +468,27 @@ function buildPage(item, pageIdx) {
     onClick: () => openExerciseSettings(ex.id, () => rebuildPages(ex.id)),
   }, '⚙');
 
+  /* === Objetivo del motor para HOY ===
+   * Se calcula desde el histórico (última sesión) → estable durante todo el
+   * entreno. Es SOLO una guía: nunca se guarda ni siembra la fila.
+   *   - motor decide SUBIR  → "objetivo · sube a X kg" (te lo ganaste)
+   *   - motor decide BAJAR  → "objetivo · baja a X kg" (descarga)
+   *   - motor MANTIENE      → "objetivo · {tope} reps a X kg" (cierra el tope
+   *                            del rango en todas las series y la próxima subes)
+   * No se muestra en peso corporal ni sin histórico. */
+  let goalChip = null;
+  if (last && ex.progressionType !== 'bodyweight'
+      && suggestedW != null && lastTopW != null) {
+    const rMaxM = String(_exRange).match(/-\s*(\d+)/);
+    const rMax  = rMaxM ? rMaxM[1] : null;
+    let cls = 'hold', txt;
+    if (suggestedW > lastTopW)      { cls = 'up';   txt = `objetivo · sube a ${suggestedW} kg`; }
+    else if (suggestedW < lastTopW) { cls = 'down'; txt = `objetivo · baja a ${suggestedW} kg`; }
+    else txt = rMax ? `objetivo · ${rMax} reps a ${suggestedW} kg`
+                    : `objetivo · ${suggestedW} kg`;
+    goalChip = h('div', { class: `aw-goal ${cls}` }, txt);
+  }
+
   const head = h('div', { class: 'aw-ex-head' },
     h('div', { class: 'aw-ex-titles' },
       h('div', { class: 'aw-ex-name-row' },
@@ -458,6 +498,7 @@ function buildPage(item, pageIdx) {
       ),
       h('div', { class: 'aw-ex-meta' },
         `${escapeH(ex.group)} · ${item.sets}×${_exRange} · descanso ${fmtMMSS(restSec)}`),
+      ...(goalChip ? [goalChip] : []),
     ),
     h('div', { class: 'aw-ex-last' },
       last
@@ -587,7 +628,12 @@ function buildPage(item, pageIdx) {
       row[key] = v === '' ? '' : (key === 'reps' ? parseInt(v, 10) : parseFloat(v));
       if (key === 'weight') {
         row.userW = true;                 // esta fila fue editada a mano
-        if (!last) propagateWeight(i);    // solo si no hay registro previo
+        // Propaga el peso a las series POSTERIORES aún no tocadas ni completas
+        // (propagateWeight respeta userW/done). Antes solo corría sin
+        // histórico; ahora también con histórico, para que subir al "objetivo"
+        // en la serie 1 arrastre a las demás sin re-teclear. Las filas
+        // sembradas desde el histórico no tienen userW → se actualizan.
+        propagateWeight(i);
       }
       if (isWeight) fitWeightFont(inp);   // re-escala si cambia el nº de dígitos
       if (row.done) schedulePersist();

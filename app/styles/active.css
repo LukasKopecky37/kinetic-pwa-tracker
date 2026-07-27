@@ -119,6 +119,27 @@ body.aw-open .rest-panel { display: none !important; }
 }
 .aw-ex-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
+/* Objetivo del motor para HOY — guía sutil, NO se guarda. Bajo la meta.
+   Es una pista ("sube si puedes"), nunca el número que registras con ✓. */
+.aw-goal {
+  display: inline-flex; align-items: center;
+  margin-top: 8px;
+  padding: 3px 10px;
+  font-size: 11.5px; font-weight: 700;
+  letter-spacing: .2px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+.aw-goal.up {
+  color: var(--accent);
+  border-color: rgba(255,107,0,.35);
+  background: rgba(255,107,0,.10);
+}
+.aw-goal.down { color: var(--text-2); }
+
 /* === Botón "Tips" del ejercicio · pill horizontal === */
 .aw-ex-tips {
   position: relative;
