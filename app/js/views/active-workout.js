@@ -179,22 +179,40 @@ function persist(state) {
         out.repsR = hasR ? R : 0;
         out.reps  = out.repsL + out.repsR;
       }
-      // Si la fila tiene weightL/weightR explícitos (futura UI por lado),
-      // los respetamos; si no, espejamos `weight` en ambos lados cuando
-      // hay split activo en el ejercicio. Eso garantiza que cada set
-      // unilateral tenga DOS pesos consultables independientes.
-      const wL = numify(r.weightL);
-      const wR = numify(r.weightR);
-      const hasWL = Number.isFinite(wL) && wL >= 0 && r.weightL !== '' && r.weightL != null;
-      const hasWR = Number.isFinite(wR) && wR >= 0 && r.weightR !== '' && r.weightR != null;
-      if (hasWL || hasWR) {
-        out.weightL = hasWL ? wL : numify(r.weight);
-        out.weightR = hasWR ? wR : numify(r.weight);
-        out.weight  = Math.max(out.weightL, out.weightR);
-      } else if (state.split) {
-        // split activo, sin inputs per-side todavía → espejamos el peso.
-        out.weightL = numify(r.weight);
-        out.weightR = numify(r.weight);
+      // INVARIANTE DE SEGURIDAD (bug crítico corregido — auditoría pre-gym):
+      // `out.weight` (calculado arriba, línea ~153) es el peso que el
+      // usuario tecleó/ajustó en ESTA fila, en ESTE momento. weightL/weightR
+      // NUNCA pueden sobreescribirlo salvo que el ejercicio esté REALMENTE
+      // en modo "manos separadas" (state.split) — antes, `freshRow()`
+      // sembraba weightL/weightR con el peso HISTÓRICO de la sesión anterior
+      // como espejo para ese modo, pero editar el peso bilateral normal
+      // (input o stepper ±) solo tocaba `row.weight`, dejando weightL/weightR
+      // congelados en el valor viejo. Al persistir, `Math.max(weightL,
+      // weightR)` pisaba el peso recién editado con el histórico — el
+      // usuario veía "70" en pantalla pero se guardaba "72.5". Bilateral
+      // (el 99% de los ejercicios) NUNCA debe leer weightL/weightR para
+      // decidir `weight`: son solo un espejo DERIVADO, nunca la fuente.
+      if (state.split) {
+        // Unilateral estricto: aquí SÍ son la fuente de verdad (el usuario
+        // los edita directamente por lado); max(L,R) es el criterio correcto.
+        const wL = numify(r.weightL);
+        const wR = numify(r.weightR);
+        const hasWL = Number.isFinite(wL) && wL >= 0 && r.weightL !== '' && r.weightL != null;
+        const hasWR = Number.isFinite(wR) && wR >= 0 && r.weightR !== '' && r.weightR != null;
+        if (hasWL || hasWR) {
+          out.weightL = hasWL ? wL : out.weight;
+          out.weightR = hasWR ? wR : out.weight;
+          out.weight  = Math.max(out.weightL, out.weightR);
+        } else {
+          out.weightL = out.weight;
+          out.weightR = out.weight;
+        }
+      } else {
+        // Bilateral normal: `out.weight` manda, sin excepción. weightL/R son
+        // un simple espejo (por si el usuario activa "manos separadas" más
+        // adelante y algo lee estos campos), nunca pisan el peso real.
+        out.weightL = out.weight;
+        out.weightR = out.weight;
       }
       return out;
     })
