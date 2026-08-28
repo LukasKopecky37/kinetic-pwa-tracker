@@ -20,6 +20,7 @@
 
 import { $, $$, h, mount } from '../utils/dom.js';
 import { fmtMMSS, fmtTopSet, escapeH } from '../utils/format.js';
+import { parseRepRange } from '../analytics/progression.js';
 import { roman } from '../utils/roman.js';
 import { Store } from '../store/store.js';
 import { topSet } from '../analytics/prs.js';
@@ -333,6 +334,22 @@ function buildPage(item, pageIdx) {
   const baseW      = lastTop ? lastTop.weight : '';   // fallback: último peso REAL
   const targetReps = parseTargetReps(_exRange)
     || (lastTop ? lastTop.reps : '');
+  /* === ¿El motor decide SUBIR o BAJAR peso? (doble progresión) ===
+   * Si la última sesión cumplió el objetivo estricto (todas las series al
+   * tope del rango) o forzó un deload, el peso de trabajo CAMBIA respecto a
+   * lo que hiciste la última vez — te lo ganaste (o toca bajar) con tu
+   * propio rendimiento, no es una sugerencia especulativa. En ese caso las
+   * filas arrancan YA en el peso nuevo, con las reps en el MÍNIMO del rango
+   * (al cambiar de peso, vuelves a acumular reps desde abajo — el patrón
+   * clásico de doble progresión). Si el motor MANTIENE, seguimos mostrando
+   * lo que hiciste realmente (freshRow/lastSetForRow) para que intentes
+   * superarlo. Misma comparación que usa el chip "objetivo" más abajo.
+   * Sigue siendo 100% editable — si ese día no te sale, lo ajustas tú mismo
+   * antes de marcar ✓ (el fix de persist() garantiza que se guarda lo que
+   * haya en la fila, nunca la sugerencia por sí sola). */
+  const rangeMin    = parseRepRange(_exRange).min;
+  const weightChanges = !!(last && ex.progressionType !== 'bodyweight'
+    && suggestedW != null && lastTopW != null && suggestedW !== lastTopW);
 
   /* === "Última" dinámica por fila ===
      Antes el placeholder de peso/reps era el mismo para TODAS las filas
@@ -374,12 +391,24 @@ function buildPage(item, pageIdx) {
   //                            edita estos cuatro campos directamente; persist
   //                            sincroniza `weight = max(L,R)` y `reps = L+R`.
   //   rpe                    → opcional.
-  // Fila nueva (no completada) sembrada con lo que se hizo REALMENTE en esa
-  // misma serie la última vez — no la sugerencia. `lastSetForRow(i)` ya cae a
-  // la última serie registrada si hoy haces más series que la semana pasada.
-  // Si no hay histórico → peso vacío (baseW='') y reps en blanco: el usuario
-  // registra su primera marca. Así el ✓ guarda SIEMPRE la realidad.
+  // Fila nueva (no completada). Dos casos:
+  //   - El motor decide SUBIR/BAJAR (weightChanges) → arranca en el peso
+  //     nuevo, reps al mínimo del rango. Ganado con tu rendimiento real de
+  //     la última sesión, no es una sugerencia especulativa.
+  //   - El motor MANTIENE (o no hay histórico) → arranca con lo que se hizo
+  //     REALMENTE en esa misma serie la última vez (`lastSetForRow(i)`),
+  //     para que intentes superarlo. Si no hay histórico → peso vacío
+  //     (baseW='') y reps en blanco: el usuario registra su primera marca.
+  // En ambos casos la fila sigue siendo 100% editable — el ✓ guarda SIEMPRE
+  // lo que haya en la fila en ese momento (ver invariante en persist()).
   function freshRow(i) {
+    if (weightChanges) {
+      return {
+        weight: suggestedW, reps: rangeMin,
+        weightL: suggestedW, weightR: suggestedW,
+        repsL: '', repsR: '', rpe: '', done: false,
+      };
+    }
     const rl = lastSetForRow(i);
     const w  = (rl && rl.weight != null && rl.weight !== '') ? rl.weight : baseW;
     const rp = (rl && rl.reps   != null && rl.reps   !== '') ? rl.reps   : '';
@@ -488,22 +517,22 @@ function buildPage(item, pageIdx) {
 
   /* === Objetivo del motor para HOY ===
    * Se calcula desde el histórico (última sesión) → estable durante todo el
-   * entreno. Es SOLO una guía: nunca se guarda ni siembra la fila.
-   *   - motor decide SUBIR  → "objetivo · sube a X kg" (te lo ganaste)
-   *   - motor decide BAJAR  → "objetivo · baja a X kg" (descarga)
-   *   - motor MANTIENE      → "objetivo · {tope} reps a X kg" (cierra el tope
-   *                            del rango en todas las series y la próxima subes)
-   * No se muestra en peso corporal ni sin histórico. */
+   * entreno. Etiqueta lo que YA aplicamos en las filas vía `weightChanges`:
+   *   - motor decide SUBIR/BAJAR (weightChanges) → "objetivo · sube/baja a
+   *     X kg" — las filas YA arrancan en ese peso (freshRow), reps al
+   *     mínimo del rango. El chip confirma el porqué, no siembra nada extra.
+   *   - motor MANTIENE → "objetivo · {tope} reps a X kg" (cierra el tope
+   *     del rango en todas las series y la próxima sesión sube)
+   * No se muestra en peso corporal ni sin histórico. Sigue siendo solo una
+   * ETIQUETA: lo que decide qué se guarda es siempre el valor de la fila. */
   let goalChip = null;
   if (last && ex.progressionType !== 'bodyweight'
       && suggestedW != null && lastTopW != null) {
-    const rMaxM = String(_exRange).match(/-\s*(\d+)/);
-    const rMax  = rMaxM ? rMaxM[1] : null;
+    const rangeMax = parseRepRange(_exRange).max;
     let cls = 'hold', txt;
     if (suggestedW > lastTopW)      { cls = 'up';   txt = `objetivo · sube a ${suggestedW} kg`; }
     else if (suggestedW < lastTopW) { cls = 'down'; txt = `objetivo · baja a ${suggestedW} kg`; }
-    else txt = rMax ? `objetivo · ${rMax} reps a ${suggestedW} kg`
-                    : `objetivo · ${suggestedW} kg`;
+    else txt = `objetivo · ${rangeMax} reps a ${suggestedW} kg`;
     goalChip = h('div', { class: `aw-goal ${cls}` }, txt);
   }
 
@@ -663,14 +692,17 @@ function buildPage(item, pageIdx) {
   /**
    * Escala el font-size del input de KG según los dígitos que muestra (valor
    * o, si está vacío, su placeholder "ghost"). Evita que un peso de 3+ dígitos
-   * (137, 200, 137.5) se recorte contra los botones ± (fix IMG_6101/6102).
-   * Togglea las clases .dig3 / .dig4 que define active.css.
+   * (137, 200, 137.5) se recorte contra los botones ± (fix IMG_6101/6102,
+   * reforzado en la auditoría pre-gym: 4 dígitos —107.5, 262.5— es el caso
+   * NORMAL en compuestos, no la excepción; añadido un nivel .dig5 para 5+).
+   * Togglea las clases .dig3 / .dig4 / .dig5 que define active.css.
    */
   function fitWeightFont(inp) {
     const shown = (inp.value && inp.value.length) ? inp.value : (inp.placeholder || '');
     const digits = String(shown).replace(/[.,\s]/g, '').length;   // sin separadores
     inp.classList.toggle('dig3', digits === 3);
-    inp.classList.toggle('dig4', digits >= 4);
+    inp.classList.toggle('dig4', digits === 4);
+    inp.classList.toggle('dig5', digits >= 5);
   }
 
   /* Stepper [- N +] para reps: sin teclado nativo en el gym. Smart default:

@@ -261,10 +261,14 @@ body.aw-open .rest-panel { display: none !important; }
 .aw-set-head,
 .aw-set {
   display: grid;
-  /* KG algo más ancho que REPS (2.3 vs 2) para alojar pesos de 3 dígitos
-     (135, 137, 200 kg) sin recortar; RPE se estrecha (1fr) por ser opcional. */
-  grid-template-columns: 28px minmax(0,2.3fr) minmax(0,2fr) minmax(0,1fr) 50px 22px;
-  gap: 8px; align-items: center;
+  /* KG bastante más ancho que REPS (3.2 vs 1.7) para alojar pesos de 4+
+     dígitos con decimal (107.5, 262.5, 272.5 kg — el caso NORMAL en
+     ejercicios compuestos, no una excepción) sin recortar el número contra
+     los botones ±. RPE se estrecha más (0.9fr): es opcional y como mucho
+     muestra 1-2 caracteres. Columnas fijas (#, ✓, ×) también apretadas un
+     poco para ceder más espacio a KG — sus glifos no lo necesitan. */
+  grid-template-columns: 26px minmax(0,3.2fr) minmax(0,1.7fr) minmax(0,0.9fr) 46px 20px;
+  gap: 6px; align-items: center;
 }
 /* === Modo UNILATERAL ESTRICTO (sub-filas I/D apiladas) ===
  * El header sigue siendo de 1 fila pero con 6 columnas alineadas con la
@@ -535,7 +539,8 @@ body.aw-open .rest-panel { display: none !important; }
   background: var(--neutral-bg);
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 0 5px;                                /* 5px lateral = respiración del "+" */
+  padding: 0 3px;                                /* 3px lateral: el resto del margen
+                                                     se cede al número (ver .aw-w-step) */
   min-height: 44px;                              /* MATCH .aw-stepper (REPS) */
   transition: border-color .15s, background .15s;
 }
@@ -558,22 +563,29 @@ body.aw-open .rest-panel { display: none !important; }
   border-radius: 0;
   transition: font-size .1s;
 }
-/* Escalado dinámico por nº de dígitos (fix overflow IMG_6101/6102): pesos de
-   3 dígitos (137) bajan un punto y aprietan el tracking; 4+ (1000, 137.5)
-   bajan más. El JS (fitWeightFont) togglea estas clases al teclear/±. */
+/* Escalado dinámico por nº de dígitos (fix overflow IMG_6101/6102, reforzado
+   en la auditoría pre-gym: 4 dígitos era el caso NORMAL — 107.5, 262.5,
+   272.5 — no la excepción, y el hueco disponible seguía sin bastar aunque
+   la fuente ya bajara). Pesos de 3 dígitos (137) bajan un punto; 4 (1000,
+   137.5) bajan más; 5+ (1000.5) al mínimo legible. Ver también el grid de
+   `.aw-set` (más ancho para KG) y los botones ± (más estrechos) — la
+   combinación de los tres es lo que hace que quepa, no la fuente sola.
+   El JS (fitWeightFont) togglea estas clases al teclear/±. */
 .aw-w-stepper .aw-in.dig3 { font-size: 15px; letter-spacing: -.3px; }
-.aw-w-stepper .aw-in.dig4 { font-size: 13px; letter-spacing: -.5px; }
+.aw-w-stepper .aw-in.dig4 { font-size: 13.5px; letter-spacing: -.4px; }
+.aw-w-stepper .aw-in.dig5 { font-size: 11.5px; letter-spacing: -.3px; }
 .aw-w-stepper .aw-in:focus {
   background: transparent;
   border-color: transparent;
 }
 
 .aw-w-step {
-  /* Cuadrado fijo 24px (un pelín más estrecho que los 26 de REPS) para
-     liberar ~4px al input central y alojar pesos de 3 dígitos. Glyph
-     centrado por flex; nunca se pega al borde (padding lateral del wrapper). */
-  flex: 0 0 24px;
-  min-width: 24px; min-height: 24px;
+  /* Cuadrado fijo 21px (más estrecho que los 26 de REPS): KG necesita ceder
+     ancho al número (pesos de 4+ dígitos con decimal son el caso normal),
+     REPS no lo necesita porque casi siempre son 1-2 dígitos. Glyph centrado
+     por flex; nunca se pega al borde (padding lateral del wrapper). */
+  flex: 0 0 21px;
+  min-width: 21px; min-height: 21px;
   background: transparent;
   border: 0;
   color: var(--accent-2);
