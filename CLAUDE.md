@@ -1,118 +1,215 @@
-# Rutina — Project context for new conversations
+# Kinetic (a.k.a. "Rutina") — Project context for new conversations
 
-This file is the handover document. **Any new Claude (CLI or Cowork) should
-read this first** before touching the code. It captures architecture, decisions,
-and pending work so you don't have to re-explain anything.
+This file is the handover document. **Any new Claude (CLI, Cowork, or a
+sub-agent) should read this first** before touching the code. It captures
+architecture, decisions, critical invariants, and pending work so you don't
+have to re-explain anything. Refreshed 2026-09-11 after a full pre-gym audit
+(v72) — the previous version of this file stopped at "Fase I" (~mid-2026H1)
+and was missing everything since (bi-series, unilateral, Web Push, HealthKit,
+the auto-progression engine, analytics dashboard, and two critical bug fixes).
 
 ---
 
 ## What this app is
 
-A premium-feel iOS-style PWA for strength training. Built collaboratively
-from an Apple Numbers spreadsheet ("RUTINA II — 24 semanas") into a full
-modular vanilla-JS application. Designed for the user (Lukas) to use in the
-gym from his iPhone, with offline support and PWA installable.
+A premium-feel iOS-style PWA for strength training, used for real by the
+user (Lukas) in the gym from his iPhone. Started from an Apple Numbers
+spreadsheet ("RUTINA II — 24 semanas") and grew into a full modular
+vanilla-JS application. Offline-first, installable, no server-side account,
+no telemetry — all data lives in the user's own IndexedDB.
+
+It doubles as a **portfolio case study** ("human-in-the-loop AI-collaborative
+engineering") — see "Repo layout" below, the case study is a SEPARATE
+artifact from the app itself and lives at the repo root, not inside `app/`.
 
 **Visual identity**: dark iOS-like, glassmorphism, orange accent (#ff7a2f),
 minimalist premium. Inspired by Strong / Hevy / Whoop / Apple Fitness, but
-more minimalist.
+more minimalist. **Error color is terracotta** (`#c0554f` / `#B85450`),
+never coral.
 
-**Run locally**: `./start.command` (Ruby preferred, Python fallback).
-**Deploy**: drag folder to https://app.netlify.com/drop.
-**Mobile**: open Netlify URL → Safari Share → Add to home screen.
-
----
-
-## Tech stack
-
-- Vanilla JS with native ES modules (no framework, no bundler).
-- IndexedDB via Dexie (loaded from CDN) + localStorage sync mirror.
-- Chart.js (CDN) for line/bar graphs.
-- PWA: `manifest.json` + `sw.js` with precache (56+ assets).
-- Single shell HTML (`index.html`), modules under `/js`, styles under `/styles`.
-- Mobile-first, iOS Safari primary target.
-- No build step. No npm. No package.json.
-
-Why this stack: maximum portability, zero dependencies to break, the user
-can read/edit any file directly. Modular ES means each concern lives in
-its own ~50-300 line file.
+**Run the app locally**: `./start.command` (Ruby preferred, Python
+fallback) from the repo root, or `python3 -m http.server 8080` from inside
+`app/`.
 
 ---
 
-## File layout
+## Repo layout (top level — read this before assuming "the app" = everything)
 
 ```
-/
-├── index.html              shell (~130 lines, loads modules)
-├── manifest.json           PWA manifest
-├── sw.js                   service worker (precache 56 assets)
-├── icon.svg                app icon (mancuerna naranja)
-├── start.command           local dev launcher (Ruby/Python fallback)
-├── styles/                 6 files, ~900 lines total
-│   ├── tokens.css          CSS variables (the single source of design tokens)
-│   ├── base.css            reset, body, header, brand
-│   ├── layout.css          main, bottom tabs
-│   ├── components.css      cards, chips, modal, sets-list, etc.
-│   ├── views.css           home sections, routine view, settings, heatmap
-│   ├── animations.css      view transitions, confetti, streak banner
-│   └── active.css          full-screen active-workout player (Fase I)
-└── js/                     46 files, ~5300 lines total
-    ├── main.js             entry, registers service worker
-    ├── app.js              orchestrator (tab nav, home↔routine, header)
-    ├── constants.js        ROMAN, DAY_NAMES, GROUPS, MUSCLE_MAP
+GYM/
+├── app/                     THE ACTUAL PWA. Deployed as-is to Netlify
+│                            (manually) and to Vercel (auto, at a sub-path).
+│                            Self-contained: manifest, sw.js, icon, styles/, js/.
+├── index.html               A SEPARATE, unrelated file: the "case study"
+│                            LANDING PAGE for the portfolio narrative (AAA
+│                            "Living Dashboard" hero: self-drawing chart +
+│                            floating phone mockups). NOT the app. Deployed
+│                            via Vercel (root `vercel.json`). Don't confuse
+│                            this with `app/index.html` (the real app shell,
+│                            ~190 lines) when asked to "edit the landing page"
+│                            vs "edit the app".
+├── IMG_5057.jpg/IMG_5059.PNG  Phone-mockup screenshots used BY the landing
+│                            page above (tracked in git, referenced by path).
+├── api/                     Vercel serverless functions — the Web Push
+│                            backend (see "Web Push notifications" below).
+├── ios/                     Capacitor native iOS wrapper (generated by
+│                            `npx cap add ios`). GITIGNORED — lives ONLY on
+│                            this Mac. See "HealthKit / native wrapper" below.
+├── node_modules/, package.json, package-lock.json, capacitor.config.json
+│                            ONLY needed for: (a) the Web Push backend
+│                            (`web-push` dep) and (b) the OPTIONAL native
+│                            iOS wrapper (Capacitor + capacitor-health
+│                            devDeps). The web app itself needs NONE of this
+│                            — no build step, no npm, no bundler for `app/`.
+├── deploy-netlify.command   Double-click helper: syncs `app/` →
+│                            ~/Desktop/Kinetic-App-Netlify, opens Netlify
+│                            Drop + Finder. Prefer telling the user to run
+│                            this over doing the rm-rf/cp dance by hand.
+├── CONTEXTO-CHAT.md         Reference doc FOR THE USER to paste into a
+│                            plain claude.ai chat (no code access) so it can
+│                            help him draft prompts. Keep it in sync with
+│                            reality when features change; it is prose, not
+│                            code-facing.
+├── progress-dashboard.html  Standalone tool (NOT part of the app): open it
+│                            directly, load a `rutina-backup-*.json` export,
+│                            get charts + 1RM predictions. For reviewing
+│                            backups outside the PWA.
+├── NATIVE-HEALTHKIT-SETUP.md, PUSH-SETUP.md   Step-by-step guides for the
+│                            two optional backend pieces (native/HealthKit,
+│                            Web Push). Written for a terminal/git beginner.
+├── README.md                Portfolio-facing README. NOTE: currently has a
+│                            broken link to `./portfolio-presentation.html`
+│                            (doesn't exist — the case study now lives at
+│                            root `index.html`). Needs fixing if touched.
+├── rutina.v4.backup         Old pre-refactor monolith snapshot. Gitignored,
+│                            harmless, historical safety net — leave it.
+└── vercel.json               Deploy config for the ROOT project (landing
+                             page), cleanUrls + trailingSlash.
+```
+
+---
+
+## Tech stack (the app itself, `app/`)
+
+- Vanilla JS with native ES modules (no framework, no bundler).
+- IndexedDB via Dexie (CDN) + localStorage sync mirror.
+- Chart.js (CDN) for line/bar graphs.
+- PWA: `manifest.json` + `sw.js` with precache (~70 assets as of v72).
+- Single shell HTML (`app/index.html`), modules under `app/js/`, styles
+  under `app/styles/`.
+- Mobile-first, iOS Safari primary target.
+- **No build step, no bundler, for the app itself.** The repo-root
+  `package.json` exists ONLY for the two optional backend pieces (Web Push
+  serverless functions, native Capacitor wrapper) — it is irrelevant to
+  running or editing `app/`.
+
+Why this stack: maximum portability, zero dependencies to break, the user
+can read/edit any file directly.
+
+---
+
+## File layout — `app/js/` (complete as of v72)
+
+```
+app/
+├── index.html               shell, loads modules
+├── manifest.json            PWA manifest
+├── sw.js                    service worker, CACHE_VERSION = 'rutina-vNN'
+│                            (bump on every deploy — see "Deploy" below)
+├── icon.svg
+├── styles/
+│   ├── tokens.css           CSS variables — single source of design tokens
+│   ├── base.css             reset, body, header, brand
+│   ├── layout.css           main, bottom tabs
+│   ├── components.css       cards, chips, modal, sets-list, etc.
+│   ├── views.css            home sections, routine view, settings, heatmap
+│   ├── animations.css       view transitions, confetti, streak banner
+│   └── active.css           full-screen active-workout player (the biggest
+│                            stylesheet — most weight-pill/layout bugs live
+│                            in the `.aw-set` grid and `.aw-w-stepper` here)
+└── js/
+    ├── main.js               entry, registers service worker
+    ├── app.js                orchestrator (tab nav, home↔routine, header,
+    │                         subview transition animation — see the v70
+    │                         entry in "Bugs fixed" if touching this)
+    ├── constants.js          ROMAN, DAY_NAMES, GROUPS, MUSCLE_MAP
     ├── utils/
-    │   ├── dom.js          $, $$, h(tag,props,...children), mount()
-    │   ├── date.js         todayISO, fmtDate, daysSince
-    │   ├── format.js       fmtRepsCompact, fmtTopSet, fmtMMSS, escapeH
+    │   ├── dom.js            $, $$, h(tag,props,...children), mount()
+    │   ├── date.js           todayISO, fmtDate, daysSince
+    │   ├── format.js         fmtRepsCompact, fmtTopSet, fmtMMSS, escapeH
     │   └── roman.js
-    ├── store/              persistence + CRUD + event bus
-    │   ├── store.js        Store facade (~400 lines)
-    │   ├── seed.js         seedData() + generateDemoSessions() + migrateOldSession()
+    ├── store/                persistence + CRUD + event bus
+    │   ├── store.js          Store facade — the ONLY thing views should
+    │   │                     import for data access
+    │   ├── seed.js           seedData() + generateDemoSessions() +
+    │   │                     migrateOldSession()
     │   ├── exercise-catalog.js  static ES catalog (45 exercises) + group
-    │   │                   normalization + catalogToExercise() (Fase I+)
-    │   ├── migrations.js   v2/v3/v4/v5→v6 chain, async load
-    │   ├── db.js           Dexie wrapper (IndexedDB)
-    │   └── events.js       on/off/emit
-    ├── analytics/          PURE functions, no DOM/Store access
-    │   ├── one-rm.js       estimate1RM (Epley), bestEstimated1RM
-    │   ├── volume.js       sessionVolume, sessionSetCount, weeklySetsByGroup, adherenceMatrix
-    │   ├── prs.js          topWeight, topSet, isPR
-    │   ├── progression.js  suggestNextWeight, averagePosition, parseRepRange
-    │   ├── stagnation.js   isStalled, findStalledExercises
-    │   ├── streak.js       streakDays, weeklyConsistency
-    │   ├── muscles.js      activeMuscles
+    │   │                     normalization + catalogToExercise()
+    │   ├── migrations.js     v2→v6 chain, async load, ensureFields()
+    │   ├── db.js             Dexie wrapper (IndexedDB)
+    │   ├── events.js         on/off/emit
+    │   └── import-history.js  CSV importer (parseHistoryCSV, seedHistoricalData)
+    ├── analytics/            PURE functions, no DOM/Store access — testable
+    │   │                     in plain Node (see "Auto-progression engine")
+    │   ├── one-rm.js         estimate1RM (Epley), bestEstimated1RM
+    │   ├── volume.js         sessionVolume, weeklySetsByGroup, adherenceMatrix
+    │   ├── prs.js            topWeight, topSet, isPR, setSideWeight/Reps,
+    │   │                     bestSetVolume, sessionTotalVolume
+    │   ├── progression.js    THE auto-progression engine — see dedicated
+    │   │                     section below, read it fully before touching
+    │   ├── stagnation.js     isStalled, findStalledExercises
+    │   ├── streak.js         streakDays, weeklyConsistency
+    │   ├── muscles.js        activeMuscles
+    │   ├── muscle-load.js    biomechanics layer for the heatmap
+    │   │                     (EXERCISE_MUSCLES, calculateMuscleVolume,
+    │   │                     resolveBiomech — see "Muscle heatmap" below)
     │   ├── workout-summary.js  summarizeWorkout, fmtDuration
-    │   └── insights.js     generateInsights (8 rules)
-    ├── components/         UI primitives, h() based, return HTMLElement
-    │   ├── HistoryChip.js
-    │   ├── StatsCard.js
-    │   ├── RoutineButton.js
-    │   ├── InsightCard.js
-    │   ├── ReadinessSliders.js
-    │   └── muscle-map.js   SVG anatomy diagram (front + back)
-    ├── services/           side effects (DOM, audio, vibration, network)
-    │   ├── modal.js        openModal(html), closeModal(), bindModalDismiss()
-    │   ├── toast.js        toast(msg, kind)
-    │   ├── audio.js        beepEndOfRest()
-    │   ├── haptics.js      vibrate(pattern)
-    │   ├── rest-timer.js   RestTimer (singleton)
-    │   ├── plate-calc.js   compute(weight, barWeight), PLATE_CLASS
-    │   ├── backup.js       exportJSON, importJSON
-    │   ├── confetti.js     fireConfetti(x, y) — canvas particle burst
-    │   └── pwa.js          registerServiceWorker
-    ├── charts/             Chart.js wrappers
-    │   ├── theme.js        CHART colors (deliberately not coupled to CSS vars)
-    │   ├── progress.js     renderProgressChart
-    │   └── volume.js       renderVolumeChart
-    └── views/              high-level compositions, mounted in tabs
-        ├── home.js         hero + days section + other routines section
-        ├── routine.js      day workout view, set-by-set form
-        ├── history.js      chips per exercise + edit session modal
-        ├── progress.js     stats + chart + suggestion box
-        ├── analysis.js     insights + volume + heatmap + stalled list
-        ├── settings.js     mesos, routines, library, rest, data sections
-        ├── workout.js      readiness modal + start/finish + summary
-        └── active-workout.js  full-screen player: carousel + per-set ✓ + timer (Fase I)
+    │   ├── workout-metrics.js  workoutDurationSec, weeklyDurationMinutes,
+    │   │                     moodByDate, energyPRCorrelation, totalActiveKcal
+    │   └── insights.js       generateInsights (8 rules; kept in code, no
+    │                         longer rendered in Análisis — see below)
+    ├── components/           UI primitives, h()-based, return HTMLElement
+    │   ├── HistoryChip.js, StatsCard.js, RoutineButton.js, InsightCard.js
+    │   ├── ReadinessSliders.js, muscle-map.js  (SVG anatomy front+back)
+    │   └── DecisionChip.js   renders the up/hold/down pill — see
+    │                         "Decision chip" below
+    ├── services/             side effects (DOM, audio, vibration, network)
+    │   ├── modal.js, toast.js, audio.js, haptics.js, confetti.js, pwa.js
+    │   ├── rest-timer.js     RestTimer singleton — WALL-CLOCK (`endAt`
+    │   │                     timestamp), survives iOS screen-lock; never
+    │   │                     go back to a setInterval counter here
+    │   ├── plate-calc.js     compute(weight, barWeight), PLATE_CLASS
+    │   ├── backup.js         exportJSON()/importJSON() — JSON.stringify of
+    │   │                     the ENTIRE Store.data, nothing excluded
+    │   ├── tips-modal.js     shared exercise-notes editor (used by both the
+    │   │                     player and Progreso/Biblioteca)
+    │   ├── push.js           client-side Web Push subscription
+    │   │                     (VAPID_PUBLIC hardcoded — see "Web Push" below)
+    │   └── health.js         Apple HealthKit bridge — see "HealthKit" below
+    ├── charts/               Chart.js wrappers
+    │   ├── theme.js          CHART colors (deliberately decoupled from CSS
+    │   │                     vars — do not "simplify" this coupling away)
+    │   ├── progress.js, volume.js, exercise-volume.js
+    │   ├── workout-duration.js, body-composition.js
+    └── views/                high-level compositions, mounted in tabs
+        ├── home.js           drill-down dashboard (Rutina → Días)
+        ├── routine.js        day workout view, set-by-set FORM (not the
+        │                     active-workout player — a separate, simpler
+        │                     editor used outside a live session)
+        ├── history.js        chips per exercise + edit session modal
+        ├── progress.js       stats + chart + decision chip + suggestion
+        ├── analysis.js       KPIs + muscle heatmap + duration/mood charts
+        ├── settings.js       mesos, routines, library, rest, data sections
+        ├── workout.js        readiness modal + start/finish + summary +
+        │                     kcal row (manual or HealthKit-read)
+        ├── exercise-settings.js  per-exercise modal: rest, rep range,
+        │                     increment, progression type, unilateral toggle
+        ├── body.js           body measurements (weight, fat %, girths) +
+        │                     charts over time
+        └── active-workout.js  THE PLAYER — full-screen carousel, per-set ✓,
+                              rest timer, bi-series flow. The single most
+                              fragile file in the app; read its dedicated
+                              section below in full before editing.
 ```
 
 ---
@@ -128,10 +225,13 @@ data = {
   currentMesoId,
   exercises: [                         // global library
     { id, name, group, compound,
-      muscle?, equipment? }            // optional, set when materialized from
-                                       // the catalog (granular muscle + gear).
-                                       // `group` stays canonical (GROUPS) so
-                                       // MUSCLE_MAP / volume analytics work.
+      muscle?, equipment?,             // set when materialized from catalog
+      progressionType?,                // 'standard' (default) | 'assisted' | 'bodyweight'
+      autoIncrementKg?,                // per-exercise override of the default 2.5kg bump
+      targetRepRange?,                 // { min, max } — overrides the routine item's repRange
+      defaultRest?,                    // per-exercise override of the routine item's rest
+      isUnilateral? / unilateralSplit?, // legacy flag / current flag — see "Unilateral" below
+      tips? }                          // free-text technical notes, editable from player + Progreso
   ],
   routines: [                          // "days" of a mesociclo (lunes/martes/etc)
     {
@@ -140,7 +240,8 @@ data = {
       items: [
         {
           exerciseId, sets, repRange, rest,
-          days: [n]                    // subset of routine.days (multi-day support)
+          days: [n],                   // subset of routine.days
+          supersetGroupId?             // bi-series pairing — see "Bi-series" below
         }
       ]
     }
@@ -148,281 +249,394 @@ data = {
   sessions: [                          // one entry per exercise per training day
     {
       id, date, exerciseId, mesoId,
-      workoutId?,                      // link to parent Workout if any
-      sets: [                          // v6: array of independent sets
-        { weight, reps, rpe?, warmup? }
+      workoutId?,
+      sets: [                          // each set independent
+        { weight, reps, rpe?, warmup?,
+          weightL?, weightR?, repsL?, repsR? }  // unilateral per-side data;
+                                                 // weight/reps stay the
+                                                 // BILATERAL canonical fields
+                                                 // that classic analytics read
       ],
-      order,                           // execution order on that date (I, II, ...)
-      notes
+      order,
+      notes,
+      nextOverride?,                   // 'up'|'down'|'flat' — user's manual
+                                        // steer for the NEXT session, read by
+                                        // suggestNextWeight()
+      temporary?                       // exercise added on-the-fly mid-workout,
+                                        // not part of the routine template
     }
   ],
-  workouts: [                          // a complete training session container
+  workouts: [
     {
       id, mesoId, routineId, date,
       startAt, endAt,
-      readiness: { energy, sleep, motivation, fatigue, stress } | null
+      readiness: { energy, sleep, motivation, fatigue, stress } | null,
+      activeKcal?                      // manual entry or HealthKit read
     }
   ],
-  activeWorkoutId,                     // id of in-progress workout, if any
+  activeWorkoutId,
+  bodyMeasurements: [ { id, date, weight?, bodyFat?, waist?, chest?, ... } ],
   settings: { lastRoutineId, defaultRest }
 }
 ```
 
 ### Key mental model
 
-The terminology in the UI vs. the code differs deliberately:
+| User says          | Code calls it |
+|---------------------|---------------|
+| "rutina" (program)  | `mesociclo` (data.mesos[]) |
+| "día" (workout)      | `routine` (data.routines[]) |
+| "ejercicio"          | `item` inside a routine, references a library `exercise` |
+| "serie"              | a set inside session.sets[] |
+| "sesión"             | a `session` (one exercise registered on a date) |
+| "entrenamiento"      | a `workout` (groups multiple sessions of the same day) |
 
-| User says        | Code calls it |
-|------------------|---------------|
-| "rutina" (program) | `mesociclo` (data.mesos[]) |
-| "día" (workout)  | `routine` (data.routines[]) |
-| "ejercicio"      | `item` inside a routine, references a library `exercise` |
-| "serie"          | a set inside session.sets[] |
-| "sesión"         | a `session` (one exercise registered on a date) |
-| "entrenamiento"  | a `workout` (groups multiple sessions of the same day) |
-
-Hierarchy decision (no migration): the app is intentionally **2 visible
-levels** — "Rutina" (the container, = `mesociclo`/`data.mesos[]`, e.g.
-"Hipertrofia 4 días") and "Día" (= `routine`/`data.routines[]`, e.g.
-"Día 1: Push"). One Rutina per "plan"; Mesociclo and Rutina are the SAME
-concept (the user explicitly chose to fuse them rather than add a real 3rd
-DB level). The UI now says "Rutina"/"Día" consistently — the word
-"mesociclo" must NOT appear in the UI anymore (only in code/comments).
-`#mesoPill` + Settings → "Rutina (plan)" edit the Rutina; Settings → "Días"
-manages the días. Home is a **drill-down dashboard** with module state
-`openMesoId` in home.js (exports `homeShowRutinas()` / `homeOpenRutina(id)`):
-  - Level 1 (`openMesoId === null`): slim smart "Hoy" banner (CTA to the
-    active plan's due/next day) + grid of big `.rutina-card` (one per
-    `meso`, "Rutina" + name + stats + active badge) + "+ Nueva rutina".
-  - Level 2 (`openMesoId === id`): `.rutina-detail-head` (‹ back / name /
-    ✎ edit) + numbered Día cards (`.routine-grid`) + "+ Nuevo día".
-  - Tapping a Day → `Store.setCurrentMeso(mesoId)` then `App.showRoutine`
-    (the player flow). Filtering is by `mesoId` (= the "rutinaId"; there is
-    NO separate rutinaId field). `#quickEdit` now routes to Level 1.
-  `renderHome()` keeps the level on refresh (back from a Day returns to its
-  Rutina's day list). See home.js.
-- Settings refinements: `renderMesoSection` hides the "Cambiar de rutina"
-  list + delete unless `mesos.length > 1` (single-rutina view = just
-  RUTINA ACTIVA + ACCIONES + Volver). `openRoutineEditor` (the **Día**
-  editor) is 2-step: module flag `_reMetaOpen` collapses Nombre/Grupos/Días
-  into a `.re-summary` card ("✎ Editar datos" expands) so the screen
-  focuses on exercise management; "Guardar y continuar" commits + collapses.
-  Picker: "+ Crear ejercicio personalizado" is the FIRST element (top);
-  `openExerciseEditor(exId, onClose, onCreate)` — `onCreate(newEx)` fires
-  only on successful create and the picker uses it to auto-add the new
-  exercise into the día (zero extra clicks) and return to the editor.
-- Muscle heatmap (Análisis tab): `js/analytics/muscle-load.js` is the pure
-  biomechanics layer — `EXERCISE_MUSCLES` (id → primarios/secundarios, an
-  ADDITIVE map; does NOT mutate exercise-catalog.js or stored exercises),
-  `calculateMuscleVolume(sessions, byId, {daysBack=7})` (completed sets ×
-  1.0 primary / 0.5 secondary → `{muscle: pts}`), `normalizeMuscleVolume`,
-  `regionIntensities` (fine muscle → coarse SVG region via
-  `MUSCLE_TO_REGION`, since the SVG is coarser than the muscle DB),
-  `loadColor(t)` ramp. `muscle-map.js` now emits `data-region` on every
-  muscle element (the old SVG only had it in comments — the user's
-  "data-muscle matches DB strings" assumption was false) + exports
-  `updateMuscleHeatmap(root, regionNorm)`. Rendered as the `.mh-card` in
-  analysis.js (SVG + gradient legend + textual top-6). The per-day
-  `#muscleMap` is unchanged (it's "what you train today", a different thing).
-- CSV history importer: `js/store/import-history.js` —
-  `parseHistoryCSV(text,{year})` (pure: `;`-delimited, quote-aware,
-  protects decimal commas before splitting multi-weight blocks, drop-set
-  `-`→`/`, reps capped ≤50, dates `D.M` with months 11–12 → year-1) and
-  `seedHistoricalData(text,{year})` (idempotent: deterministic
-  `wimp-<date>` / `simp-<date>-<exId>` ids + dedupe by date|exerciseId;
-  merges v6 sessions/workouts into `Store.data`). Exercises are resolved by
-  case-insensitive NAME (reuse) else created with a stable `slugify` id +
-  inferred group — NOT mapped to catalog ids (no reliable mapping; that
-  would corrupt analytics). Duplicate CSV names get a "(n)" suffix.
-  Unparseable cells are skipped & reported, never invented. Wired in
-  Settings → Datos → "Importar mi histórico (CSV)" (backup-first nudge,
-  confirm, summary alert).
-- Análisis refactor (minimalista): insights engine + stalled list REMOVED
-  from the view (kept in code, just not rendered). Top of `#tab-analisis`
-  is now `#anKpis`: 3 subtle KPI cards (Top progresión = max +Δ est-1RM in
-  30 d via `bestEstimated1RM`; Consistencia = distinct training dates this
-  month; Enfoque = `FOCUS_MUSCLES` group with least 30-day muscle volume).
-  Adherence grid retitled "Frecuencia de entrenamiento" + `.hm-legend`.
-  Muscle-heatmap window widened 7→30 d. **Heatmap mapping bug fixed**:
-  `muscle-load.js` adds `foldName()` + `NAME_BIOMECH` (CSV display-name →
-  EXERCISE_MUSCLES id) + `resolveBiomech()` (id → name-alias → group
-  fallback, NEVER a Glúteos default) and `console.warn`s orphan exercises.
-  All 25 imported CSV exercises now resolve (0 orphans; bench→Pecho).
-- Pre-gym hardening audit (closed): (1) **PWA no longer cache-traps** —
-  sw.js: HTML/nav = network-first, JS/CSS = stale-while-revalidate, `sw.js`
-  itself never intercepted; pwa.js toasts "nueva versión — recarga" on
-  update. (2) **No blank-seed-over-data** — `loadStateAsync` returns
-  `{data,safeToSave}`; `Store.load` only `save()`s when not a fallback seed
-  after a read error (protects imported history from iOS IDB eviction).
-  (3) **Session ids monotonic** (`_sessionSeq`, no same-ms collision) +
-  `clearTimeout(persistT)` in toggleDone/removeRow (no stale debounced
-  persist). (4) **RestTimer is wall-clock** (`endAt` timestamp; survives
-  screen-lock between sets; `_finishTO` cleared = no ghost timer) +
-  visibilitychange re-tick. (5) **"Cambiar ej." is transient** — module
-  `extraItems` (cleared on finish/cancel/new workout); the routine TEMPLATE
-  is never polluted. (6) Meso guards in `homeOpenRutina`/`promptNewDay`.
-
-### Migration history
-
-The schema went through 6 versions. `migrations.js` handles v2/v3/v4/v5→v6
-on load, idempotently. The biggest jump was v5→v6 where `session.weight` +
-`session.reps[]` became `session.sets[]` (each set with its own
-weight/reps/rpe/warmup). See `migrateOldSession()` in seed.js.
+App is intentionally **2 visible levels**: "Rutina" (container) → "Día"
+(workout). The word "mesociclo" must never appear in the UI (only in
+code/comments). Home is a drill-down dashboard (`openMesoId` state in
+home.js). See git history around v40-50 for the full reasoning if needed —
+not repeated here since it hasn't changed since.
 
 ---
 
-## Phases completed
+## Auto-progression engine (`js/analytics/progression.js`) — READ FULLY BEFORE TOUCHING
 
-The work was done in phases, each verified with ad-hoc node tests
-(124+ passing assertions total). Phases:
+This is the mathematical core the user cares most about ("does my weight go
+up correctly"). It was audited exhaustively (33 Node assertions, all
+passing as of v72) and is currently correct. Two REAL bugs were found and
+fixed around it (not in the math itself — see "Critical bugs fixed"
+below) — the math has never been the problem; the code AROUND it that
+seeds/persists rows has been.
 
-- **A** — Modular folder structure (1 monolithic HTML → 50 modular files)
-- **B** — Pure analytics extracted from Store (delegate pattern)
-- **C** — `h()` helper + UI components (HistoryChip, StatsCard, RoutineButton)
-- **D** — Event bus on Store (on/off/emit) + IndexedDB via Dexie
-- **E** — Workout model (start/finish/readiness/summary) with summarize analytics
-- **F** — Insights engine (8 rules) + PWA real (service worker, manifest, icon)
-- **G** — Animations (view transitions, fade, streak banner), confetti at PRs, hápticas
-- **H** — v5→v6 migration to `sets[]` model; refactor all analytics; set-by-set form
-  in routine view; bigger reorder arrows; home in sections; default day fix;
-  empty seed by default with demo opt-in
-- **I** — Active workout dedicated view (`views/active-workout.js` + `styles/active.css`):
-  full-screen player, swipe carousel between exercises, per-set ✓ check with
-  incremental persist, big rest timer (RestTimer subscriber mirror), next-exercise
-  preview, auto-enter on "Iniciar" (#9), re-open from header chip / on reload
+**Exercise types** (`exercise.progressionType`, default `'standard'`):
+- `standard` — more kg = progress (free weights, machines).
+- `assisted` — LESS kg = progress (assisted pull-up/dip machines).
+- `bodyweight` — weight never changes (`bumpKgFor` returns 0); progress is
+  reps only.
+
+**The three decisions**, evaluated on the LAST session of an exercise
+(`evaluateProgression(session, repRange, targetSets, exercise)`):
+- **UP** — strict: needs ≥ `targetSets` sets done AT the resolved baseline
+  weight, AND every one of them at or above the TOP of the rep range. One
+  set short of the top (e.g. 2×12 + 1×11 on an 8-12 range) → NOT up.
+- **DOWN (deload)** — the STRICT MAJORITY (> half) of all work sets fell
+  below the MINIMUM of the range. Exactly half does NOT trigger it.
+- **HOLD** — everything else. Repeats the baseline weight.
+
+**Baseline resolution with mixed weights** (you dropped weight mid-session,
+e.g. 10, 9, 9): the baseline is the weight of the LAST set that reached the
+range minimum; if none did, it's the MODE (most frequent weight, ties
+broken by most-recent).
+
+**Unilateral** (`isUnilateral`/`unilateralSplit`): effective reps for a set
+= `min(repsL, repsR)` — the weak side gates the decision (AND rule). Both
+sides must hit the top for UP; either side missing the minimum can trigger
+DOWN.
+
+**Manual overrides** (`session.nextOverride: 'up'|'down'|'flat'`, set via
+the ▲/=/▼ "Próxima sesión" strip in the player) bridge over the automatic
+decision but still apply on top of the resolved baseline, never on the raw
+first/max weight.
+
+**Warm-up sets are always excluded** from every calculation here.
+
+Key exports: `evaluateProgression`, `resolveBaseline`, `suggestNextWeight`,
+`bumpKgFor`, `decisionFromSession`, `decisionFromHistory`, `parseRepRange`,
+`metTargetStrict`. Consumers: `active-workout.js` (the player + goal chip),
+`progress.js` (decision chip), `workout.js` (post-workout summary bumps +
+decision chip).
+
+If you ever need to re-verify this engine, write a throwaway Node script
+importing straight from `app/js/analytics/progression.js` (plain ESM, no
+DOM deps) — see the audit pattern from 2026-09-11 for the shape of a good
+test (exact-scenario tests + edge cases: half-majority, insufficient sets
+at baseline, mixed weights with none in-range, warm-up exclusion).
 
 ---
 
-## User's open backlog (9-item review)
+## Active-workout player (`js/views/active-workout.js`) — CRITICAL INVARIANTS
 
-| # | Topic | Status | Notes |
-|---|-------|--------|-------|
-| 1 | Series with different weights | **Done (Fase H)** | sets[] model |
-| 2 | Readiness → insights/correlations | Pending | needs `readiness-correlations.js` and 4 new insight rules |
-| 3 | Calendar with DailyScore | Pending | composite score formula proposed; replace heatmap |
-| 4 | Active workout dedicated view | **Done (Fase I)** | full-screen player: swipe carousel, per-set ✓ check, big timer, next preview |
-| 5 | Day assignment UX (editor sections) | Partial | default fixed (item.days = [first routine day]); section-by-day editor still flat |
-| 6 | Home redesign (priority bands) | **Done** | hero + days + other routines sections |
-| 7 | Day chips responsive | **Done** | grid 7-col |
-| 8 | Exercise order without duplicates | **Done** | auto-assigned by position; stepper removed from card |
-| 9 | Auto-enter active workout | **Done (Fase I)** | "Iniciar" → readiness → player; chip / reload re-opens it |
+This is the single most-edited, most bug-prone file in the app. Two
+non-negotiable invariants were established the hard way (real data
+corruption in the user's actual training log). **Never regress either of
+these**:
 
-Remaining work maps to Fase J (#2 readiness correlations, #3 daily-score
-calendar, polish) plus #5 (per-day editor sections, still flat).
+### Invariant 1 — the row is seeded from REALITY, never from a guess (v69)
+
+`freshRow(i)` seeds a not-yet-done row with what the user ACTUALLY did last
+time (`lastSetForRow(i)`), NOT with the engine's suggestion. The engine's
+suggestion is shown SEPARATELY as a non-editable `.aw-goal` chip
+("objetivo · sube a X kg"). Reasoning: if the suggestion pre-fills the
+editable field, a user who just taps ✓ without correcting it silently logs
+a weight they never lifted — the app used to "climb +2.5kg/week on its
+own" this way, and on dumbbells landed on impossible weights (8→10.5kg).
+
+**Exception, added v72**: when the engine's decision on the last session
+was genuinely UP or DOWN (the user EARNED the change with real past
+performance, it's not speculative), the row auto-seeds at the NEW
+suggested weight with reps at the range MINIMUM (classic double
+progression — new weight, start the rep count over). This is still
+editable and still goes through invariant 2 below untouched. When the
+decision is HOLD, rows fall back to the plain "what I actually did"
+seeding. See `weightChanges` in `buildPage()`.
+
+### Invariant 2 — `persist()` saves EXACTLY what's in the row, nothing else (v71)
+
+Tapping ✓ must persist the row's OWN CURRENT value, full stop. The bug that
+broke this (found in the 2026-09-11 pre-gym audit, live for an unknown
+prior stretch): `weightL`/`weightR` are mirror fields seeded by `freshRow`
+with the OLD historical weight (for the unilateral "manos separadas" case).
+Editing the normal bilateral weight (typing, or the ± stepper) only touched
+`row.weight`, leaving `weightL`/`weightR` frozen at the old value —
+`persist()` then did `out.weight = Math.max(weightL, weightR)`,
+**silently overwriting the just-edited weight with the stale one**. Screen
+showed 70kg, log recorded 72.5kg. Fix: `Math.max(weightL, weightR)` now
+only decides `weight` when `state.split` (real unilateral mode) is active;
+in normal bilateral mode `weightL`/`weightR` are a pure MIRROR of
+`out.weight`, never a source. If you ever see weight/reps not matching
+what the row displayed at the moment of ✓, suspect this class of bug first
+— any field that exists in TWO places (a "canonical" one and a
+"per-side"/"per-mode" one) is a landmine unless one is explicitly read-only
+outside its own mode.
+
+**When testing changes to this file**: reproduce in a browser with
+`Store.startWorkout()` + `window.App.showActiveWorkout()` seeded with a
+synthetic exercise/routine/session (never test on the user's real Store
+data), and always compare the DOM-displayed value against what actually
+lands in `Store.sessionsByDate(date)` after tapping ✓ — the two silently
+diverging is exactly how both bugs above shipped unnoticed.
+
+### Other player mechanics worth knowing
+- **Bi-series (supersets)**: `item.supersetGroupId` pairs two adjacent
+  items; `decorateSupersets()` annotates pages with `pairIndex`/
+  `partnerPageIdx`. Flow: finishing a set on A auto-swipes to B's same
+  set-index (no rest); finishing B starts rest, and an `onComplete`
+  callback passed to `RestTimer.start()` auto-returns to A when the rest
+  ends (if A still has pending sets). No flag/edge-detection hacks.
+- **"Cambiar ej."** (switch exercise mid-workout) is session-transient via
+  module-level `extraItems` — cleared on finish/cancel/new workout. The
+  routine TEMPLATE is never mutated by this.
+- **Weight-pill digit overflow** (fixed 2026-09-11, v72): the `.aw-set`
+  grid gives KG far more width than REPS/RPE now (3.2fr vs 1.7fr vs 0.9fr)
+  because 4-digit decimals (107.5, 262.5, 272.5) are the NORMAL case on
+  compound lifts, not an edge case. `.dig3`/`.dig4`/`.dig5` CSS classes
+  (toggled by `fitWeightFont()`) additionally shrink the font. If a weight
+  pill looks clipped again, check BOTH the grid share and the digit class
+  — font-size alone was tried first and was insufficient on its own.
+- **Subview transition overflow** (fixed 2026-09-11, v70, in `app.js` +
+  `animations.css`): the Home↔Routine slide animation used to apply an
+  unconditional `.subview.active { animation }` CSS rule with a %-based
+  translate; if the animation froze mid-flight (backgrounded app,
+  interrupted nav) the transform stuck permanently, pushing content off
+  either edge. Fixed by gating the animation behind a transient
+  `anim-in`/`anim-back` class that JS removes on `animationend` (+ a
+  360ms `setTimeout` fallback), and by using fixed px offsets (≤12px, less
+  than the 14px page padding) instead of %.
+
+---
+
+## Web Push notifications (rest-timer alerts when the phone is locked)
+
+Backend: Vercel serverless functions in `api/` (`schedule.js`, `fire.js`,
+`cancel.js`, `test-push.js`, `_cors.js`) + Upstash QStash for delayed
+callbacks + VAPID keys. Client: `app/js/services/push.js` (hardcoded
+`VAPID_PUBLIC`, safe to commit) + the `push`/`notificationclick` listeners
+in `sw.js`.
+
+**Secrets — NEVER commit these, Vercel env vars only**:
+`VAPID_PRIVATE` and `PUSH_SECRET`. If you ever see either hardcoded
+anywhere in a diff, stop and flag it before committing. See `PUSH-SETUP.md`
+for the full setup guide (beginner-friendly, was written for the user to
+follow himself).
+
+Does NOT work inside the native Capacitor wrapper (uses the web origin) —
+only in the actual web/PWA deploy. The in-app rest timer (foreground) is
+independent and always works everywhere.
+
+---
+
+## HealthKit / native wrapper (`ios/`, Capacitor)
+
+Optional second way to run the app: a native iOS shell (Capacitor 8) around
+the SAME `app/` code, that additionally unlocks real Apple Watch active-kcal
+reads via HealthKit (impossible from a plain web PWA — no web HealthKit
+API exists).
+
+- `capacitor.config.json`: `appId: "com.lukaskopecky.kinetictracker"`
+  (the shorter `com.lukaskopecky.kinetic` was already taken by another app),
+  `webDir: "app"`.
+- Plugin: `capacitor-health`. **The registered runtime name is
+  `HealthPlugin`**, NOT `Health` (its own JS export is confusingly named
+  `Health`, but `registerPlugin('HealthPlugin', {})` is what actually gets
+  attached to `window.Capacitor.Plugins`). `app/js/services/health.js`
+  reads `cap.Plugins.HealthPlugin` (with a `.Health` fallback) — if
+  HealthKit permission is silently never requested, check this FIRST.
+- **Requires a PAID Apple Developer membership** (team `2ZXL49N2NN`,
+  `kopecky072@gmail.com`) — HealthKit entitlements don't work on a free
+  personal team.
+- `ios/` is gitignored and generated (`npx cap add ios`) — it exists ONLY
+  on this Mac. Regenerating it after a disk loss means redoing: `npm
+  install` → `npx cap add ios` → `npx cap sync ios` → re-add the HealthKit
+  capability + `NSHealthShareUsageDescription` in Xcode + re-select the
+  paid team + re-set the Bundle Identifier. Fully documented in
+  `NATIVE-HEALTHKIT-SETUP.md`.
+- HealthKit **never returns data in the Simulator** — must test on a real
+  iPhone with a paired Apple Watch.
+- After any change to `app/`, sync into the native shell with `npx cap
+  copy ios` (or `sync` if plugins/deps changed) before rebuilding in Xcode.
+
+---
+
+## Decision chip (`components/DecisionChip.js`)
+
+Pure presentational: takes a `decisionFromSession`/`decisionFromHistory`
+result and renders an up/hold/down pill. Shown in `progress.js` (per
+exercise) and in the post-workout summary (`workout.js`). Does not
+recompute anything itself — purely a renderer, so if the chip and the
+player's `.aw-goal` chip ever disagree, the bug is in one of the CALL SITES
+passing a different `repRange`/`targetSets`, not in this component.
+
+---
+
+## Muscle heatmap (Análisis tab)
+
+`js/analytics/muscle-load.js` — pure biomechanics layer, additive (does not
+mutate `exercise-catalog.js` or stored exercises): `EXERCISE_MUSCLES` (id →
+primary/secondary muscles), `calculateMuscleVolume` (completed sets × 1.0
+primary / 0.5 secondary), `regionIntensities` (fine muscle → coarse SVG
+region), `loadColor(t)`. `muscle-map.js` emits `data-region` on every SVG
+element. CSV-imported exercises resolve via `foldName()` + `NAME_BIOMECH`
+alias table + group fallback (never a silent wrong-muscle default —
+`console.warn`s orphans instead).
+
+---
+
+## CSV history importer (`store/import-history.js`)
+
+`parseHistoryCSV(text, {year})` (pure, `;`-delimited, quote-aware, decimal
+commas protected, drop-sets `-`→`/`, reps capped ≤50) +
+`seedHistoricalData(text, {year})` (idempotent — deterministic ids,
+dedupe by date+exerciseId). Exercises resolved by case-insensitive NAME
+(never mapped to catalog ids — no reliable mapping exists, and forcing one
+would corrupt analytics). Wired in Settings → Datos.
+
+---
+
+## Migration history
+
+Schema went through 6 versions; `migrations.js` handles v2→v6 on load,
+idempotently. Biggest jump was v5→v6: `session.weight` + `session.reps[]`
+→ `session.sets[]` (each set independent). See `migrateOldSession()` in
+`seed.js`.
+
+---
+
+## Phases completed (running log)
+
+Early phases **A–I** (modular refactor, pure analytics, `h()` components,
+event bus + IndexedDB, workout model, insights engine + real PWA,
+animations/confetti, v6 sets[] migration, the active-workout player) are
+unchanged since — see git log before `ec77735` if you need the blow-by-blow.
+
+From there on (flat list, not gated behind formal "phase" letters after this
+point):
+- **v52** — Unilateral strict mode (per-side weight/reps, dual Bitácora, dual charts)
+- **v55** — Big refactor: assisted-exercise progression, unilateral AND rule,
+  Exercise Settings modal, rest notifications groundwork
+- **v58–v60** — QA bug fixes; rest-notification reliability research (OS-level
+  scheduling attempted, found unreliable on iOS → superseded by v61)
+- **v61** — Web Push backend (Vercel + Upstash QStash + VAPID) — reliable
+  rest alerts even with the phone locked
+- **v62** — Exercise tips (Progreso card + Biblioteca), shared modal
+- **v63** — "Bulletproof" auto-progression engine — the current strict
+  UP/DOWN rules + mixed-weight baseline resolution (see dedicated section above)
+- **v64** — Analytics dashboard: workout-duration chart, pre-workout
+  energy/mood 30-day history, energy↔PR correlation
+- **v65** — Decision chip (up/hold/down) in Progreso + post-workout summary
+- **v66–v68** — Apple HealthKit integration via Capacitor native wrapper
+  (chose native-app-wrapper path over web-only alternatives); v67 fixed
+  Capacitor/plugin version mismatches; v68 fixed the `HealthPlugin` vs
+  `Health` registration-name bug (see "HealthKit" above)
+- **Landing page work** (root `index.html`, not versioned with the app's
+  `sw.js`): phone-mockup fit + premium bezel fix, then the "Living
+  Dashboard" AAA hero redesign (self-drawing chart + floating mockups)
+- **v69** — Player rows seed from reality, not the suggestion (see
+  "Active-workout player" invariant 1 above)
+- **v70** — Subview slide-transition overflow fix (see invariant list above)
+- **v71** — **Critical**: fixed the `weightL`/`weightR` persist bug that
+  silently discarded edited weights (see invariant 2 above) — found via a
+  full pre-gym audit that reproduced it deterministically
+- **v72** — Double-progression auto-fill (row jumps to the new weight +
+  min reps when the engine's decision is genuinely UP/DOWN) + weight-pill
+  digit-overflow fix (grid rebalance + `.dig5` tier)
+
+---
+
+## Backlog / open items
+
+| # | Topic | Status |
+|---|-------|--------|
+| Readiness → insights/correlations | Partially done (v64 added energy↔PR correlation); full readiness-correlations.js + more insight rules still pending |
+| Calendar with composite DailyScore | Still pending — formula proposed, heatmap not yet replaced |
+| Per-day editor sections (day-of-week assignment UX) | Still flat/partial — default works (`item.days = [first routine day]`), no dedicated per-day sections in the editor |
+| `README.md` broken link to `portfolio-presentation.html` | Found in the 2026-09-11 audit, not yet fixed |
+| Dumbbell increments landing on non-existent weights (e.g. 8→10.5kg) | User asked about per-exercise increment presets (1/2/2.5/5kg) for isolation dumbbell work; proposed but not yet built as of v72 |
 
 ---
 
 ## Conventions
 
-- **Modules**: static imports for the dependency graph. Dynamic `import()`
-  is used in two places to break a home↔settings circular dep — those are
-  the only acceptable cases.
-- **`h()` over innerHTML**: new components and migrated views use `h()`.
-  Some modals still use innerHTML (settings editor, history edit modal,
-  readiness, plate calc, rest editor). Those should be migrated component
-  by component when touched.
-- **Pure analytics**: functions in `/js/analytics/` take `(sessions, byId)`-style
-  params, never touch `Store` directly. This makes them testable in Node and
-  reusable from any future view.
-- **Store events emitted on every mutation**: views currently still call
-  `App.refreshAll()` explicitly. The auto-wire `Store.on('change', refresh)`
-  was deliberately deferred to avoid double repaints during mutations that
-  emit multiple events (e.g., `addSession` after `removeSessionFor`).
-- **All user-provided strings escape via `escapeH()`** before going into
-  innerHTML templates.
-- **Tests**: ad-hoc Node scripts piped to stdout. No formal runner. See
-  any of the `tmp/test-*.mjs` patterns in the chat history for reference.
+- **Modules**: static imports for the dependency graph; dynamic `import()`
+  only to break the home↔settings circular dependency.
+- **`h()` over innerHTML** for new/touched code. Some older modals still
+  use innerHTML (settings editor, history edit modal, readiness, plate
+  calc, rest editor) — migrate opportunistically when touched, not proactively.
+- **Pure analytics**: `js/analytics/*` never touches `Store` or the DOM —
+  always `(sessions, byId, ...)`-style params. Keeps them Node-testable.
+- **All user-provided strings escape via `escapeH()`** before innerHTML.
+- **Tests**: ad-hoc Node scripts (ESM, import straight from the source
+  file), piped to stdout, thrown away after. No formal runner, no
+  `package.json` test script — don't add one without asking, it would
+  imply a build/test pipeline this project deliberately doesn't have.
+- **Every deploy bumps `CACHE_VERSION` in `app/sw.js`** (`rutina-vNN`) —
+  the service worker precache is versioned by this string; forgetting the
+  bump means the PWA silently keeps serving the OLD code to installed users.
 
 ---
 
-## How to run
+## Deploy
 
-```bash
-# Local dev
-./start.command       # opens Safari on http://localhost:8080
+Two independent targets, both from `app/`:
 
-# Deploy
-# Drag the GYM folder to https://app.netlify.com/drop
-
-# Quick file-level checks
-node --check js/main.js        # syntax check
-grep -rn "TODO" js/            # outstanding markers
-```
+- **Vercel**: auto-deploys on every `git push` to `main` (the root repo,
+  landing page included, via root `vercel.json`).
+- **Netlify**: manual only, no auto-deploy configured. Run
+  `./deploy-netlify.command` (double-click from Finder) — it syncs `app/`
+  → `~/Desktop/Kinetic-App-Netlify/`, opens Netlify Drop, and opens Finder
+  on the ready folder. The user drags that folder onto Netlify's "Deploys"
+  page (or the Drop page for a throwaway URL). **Prefer pointing the user
+  at this script over manually `rm -rf`/`cp -R`-ing the folder** — it
+  already does exactly that, plus cleans `.DS_Store` and confirms the
+  synced `CACHE_VERSION`.
+- After either deploy, the user needs to **fully close and reopen** the PWA
+  on his iPhone (not just background it) for the new service worker to
+  take over — backgrounding/foregrounding alone does not reload the page.
 
 ---
 
 ## How to continue in a new conversation
-
-### Option A: Claude Code (recommended for this scale)
-
-Install once: see https://docs.claude.com/en/docs/claude-code
-Then:
 
 ```bash
 cd ~/Documents/Claude/Projects/GYM
 claude
 ```
 
-First message in the new chat:
+First message: "Read CLAUDE.md, then continue with [whatever is next]." —
+respond in Spanish (the user's preferred language); he's a beginner with
+terminal/git, so narrate git/deploy steps explicitly and confirm before
+anything destructive or before pushing to prod.
 
-> Read CLAUDE.md to see the full project state, architecture and pending
-> work. Then continue with [whatever is next]. The user's preferred
-> language is Spanish.
-
-### Option B: New Cowork conversation
-
-Open a fresh Cowork session and start with:
-
-> I have a project at ~/Documents/Claude/Projects/GYM. Please read
-> CLAUDE.md in that folder first to understand the architecture and
-> pending work, then we continue. Respond in Spanish.
-
-Either way, this document plus the chat-derived test patterns let you
-pick up the work without losing context.
-
----
-
-## Last user-visible state at handover
-
-- Clean-slate seed: `seedData()` now creates ONE mesociclo and NOTHING else
-  — 0 routines, 0 library exercises, 0 sessions. User builds their real
-  routine from scratch (Home → "+ Crear primer día") and adds exercises from
-  the catalog. "Restablecer todo a estado inicial" yields this same blank
-  state. (Old defaults were `DEFAULT_LIBRARY`/`DEFAULT_ROUTINES`, now removed.)
-- Demo data still works: `DEMO_LIBRARY` (the old 16-exercise list) lives in
-  seed.js and `Store.loadDemoData()` merges any missing demo exercises before
-  injecting the demo session history, so the chart-preview button is intact.
-- Demo data available via Settings → Datos → "Cargar datos de demo".
-- Home shows current rutina's days clearly separated from other rutinas.
-- Two distinct buttons: "+ Nuevo día" and "+ Nueva rutina".
-- Reorder arrows in the routine editor are 32×28 px, hover state, drag-friendly.
-- "✎ editar" link in routine head goes straight to the editor.
-- Routine editor → "+ Añadir ejercicio" opens the catalog picker: search by
-  name (accent-insensitive), single-select chips to filter by `grupo_muscular`
-  and `equipamiento`. Picking one materializes it into the library (dedupe by
-  stable catalog id, group normalized to GROUPS) and adds it to the routine
-  with the catalog's recommended sets/reps. Custom (non-catalog) library
-  exercises still appear in the list too.
-- "▶ Iniciar entrenamiento" → readiness modal → enters the full-screen
-  active-workout player (Fase I). Swipe (or chevrons/dots) between exercises,
-  tap ✓ to log each set (auto-saves + auto-starts big rest timer), "Cancelar"
-  / "Terminar" in the top bar, "⌄" minimizes back to the app (workout keeps
-  running; the pulsing "entrenando" header chip re-opens it; a mid-workout
-  reload also re-opens it).
-- Active-workout player polish (Fase I+): set rows redesigned (single aligned
-  column header, no overlapping floating labels, circular ✓ action button with
-  `.is-completed` pop animation that disables that row's inputs); KG autofill
-  (typing weight on a set with no history propagates to later untouched sets);
-  footer "⇄ Cambiar ej." opens an in-overlay sheet to jump to another routine
-  exercise or insert one from the catalog on the fly (`rebuildPages()`).
-  `resetWorkoutSession()` (RestTimer.stop + closeActiveWorkout) kills the
-  "ghost timer" bug on finish/cancel; minimize (⌄) still keeps rest running.
-- `Store.itemsForDate()`: if the viewed date's weekday is NOT one of the
-  routine's `days`, it returns ALL the routine's items (no per-item sub-day
-  filtering). Rationale: opening "Lunes" on a Sunday to train anyway must
-  still show the workout. Per-item day filtering only applies when the date
-  actually falls on one of the routine's assigned weekdays. This drives the
-  routine view, the muscle map, and the active-workout player consistently.
-
-If the user reports a UX issue, it most likely relates to pending items
-#2, #3 or #5 above — see backlog table.
+For a plain claude.ai chat (no code access) that only needs to help him
+draft feature prompts, point him at `CONTEXTO-CHAT.md` instead — it's
+written for exactly that, and should be kept roughly in sync with this
+file's feature list when something major ships.
