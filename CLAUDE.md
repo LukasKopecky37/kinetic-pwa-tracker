@@ -578,6 +578,19 @@ point):
   a día already trained instead of advancing — reproduced with the exact
   reported scenario (today=Wed, no día scheduled that day) before and
   after the fix, in both the banner and the day-list badge.
+- **v74** — Active-workout player, two UI fixes: (1) the REPS stepper's
+  number had measured **0px** of real width for 2-digit reps (12-15 range,
+  common) — the `.aw-set` grid's REPS share had been cut too far in v72's
+  KG-overflow fix; rebalanced (KG 3.2→2.7fr, REPS 1.7→2.3fr) + shrank the
+  reps ± buttons (26→22px). (2) long exercise names (`.aw-ex-name`) used to
+  truncate to one line because TIPS/⚙ shared its row — moved both buttons
+  into a new `.aw-ex-actions` row under the ÚLTIMA chip in `.aw-ex-last`,
+  freeing the name's own row to wrap up to 2 lines
+  (`-webkit-line-clamp:2`) before ellipsis. **If you touch this grid
+  again**: verify with measured `scrollWidth`/`clientWidth` overflow on
+  BOTH the KG and REPS columns at realistic 2-digit-reps + 4-digit-decimal
+  weight values — this file has now regressed the "other" column's
+  headroom twice while fixing one side of it.
 
 ---
 

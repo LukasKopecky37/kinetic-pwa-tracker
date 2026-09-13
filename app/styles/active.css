@@ -105,17 +105,17 @@ body.aw-open .rest-panel { display: none !important; }
   padding: 6px 0 16px;
 }
 .aw-ex-titles { flex: 1; min-width: 0; }
-.aw-ex-name-row {
-  display: flex; align-items: center; gap: 8px;
-  min-width: 0;
-}
+/* Auditoría: TIPS + ⚙ vivían en la misma fila que el nombre, robándole
+   ancho y forzando el corte a "Elevación de g…" en nombres largos. Ahora
+   viven bajo el chip ÚLTIMA (ver .aw-ex-actions en .aw-ex-last) y el
+   nombre tiene la fila entera para él — con salto a 2 líneas (elipsis
+   solo si ni así cabe) en vez de truncar a la primera palabra. */
 .aw-ex-name {
   font-size: 22px; font-weight: 800; line-height: 1.15;
-  min-width: 0;
-  flex: 1;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
 }
 .aw-ex-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
@@ -222,7 +222,12 @@ body.aw-open .rest-panel { display: none !important; }
   color: var(--muted);
   font-style: italic;
 }
-.aw-ex-last { text-align: right; flex-shrink: 0; font-size: 12px; }
+.aw-ex-last {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  text-align: right; flex-shrink: 0; font-size: 12px;
+}
+/* Fila TIPS + ⚙ bajo el chip ÚLTIMA (ver comentario en .aw-ex-name). */
+.aw-ex-actions { display: flex; align-items: center; gap: 6px; }
 .aw-last-cap {
   display: block; font-size: 9px; color: var(--muted);
   text-transform: uppercase; letter-spacing: .8px; margin-bottom: 2px;
@@ -254,20 +259,23 @@ body.aw-open .rest-panel { display: none !important; }
    - Modo SPLIT (Manos separadas): 6 cols pero distintas — RPE se oculta
      para dar espacio a L y R sin sacrificar legibilidad de los inputs.
      (n · kg · L · R · check · del).
-   Distribución 2fr / 2fr / 1.2fr entre KG, REPS y RPE — KG y REPS exactamente
-   iguales (no pueden colapsar uno al otro), RPE algo más estrecho (es input
-   subjetivo y opcional, no necesita la misma anchura). minmax(0,…) impide
-   que el contenido intrínseco de los inputs fuerce overflow horizontal. */
+   Distribución real ver el grid-template-columns de abajo (KG > REPS > RPE
+   — reequilibrado varias veces; comprobar SIEMPRE con overflow medido, no a
+   ojo, antes de volver a tocar estas proporciones). minmax(0,…) impide que
+   el contenido intrínseco de los inputs fuerce overflow horizontal. */
 .aw-set-head,
 .aw-set {
   display: grid;
-  /* KG bastante más ancho que REPS (3.2 vs 1.7) para alojar pesos de 4+
-     dígitos con decimal (107.5, 262.5, 272.5 kg — el caso NORMAL en
-     ejercicios compuestos, no una excepción) sin recortar el número contra
-     los botones ±. RPE se estrecha más (0.9fr): es opcional y como mucho
-     muestra 1-2 caracteres. Columnas fijas (#, ✓, ×) también apretadas un
-     poco para ceder más espacio a KG — sus glifos no lo necesitan. */
-  grid-template-columns: 26px minmax(0,3.2fr) minmax(0,1.7fr) minmax(0,0.9fr) 46px 20px;
+  /* KG más ancho que REPS para alojar pesos de 4+ dígitos con decimal
+     (107.5, 262.5, 272.5 kg — el caso NORMAL en ejercicios compuestos, no
+     una excepción) sin recortar el número contra los botones ±. RPE se
+     estrecha más (0.8fr): es opcional y como mucho muestra 1-2 caracteres.
+     REPS subido de 1.7→2.3fr (auditoría: con reps de 2 dígitos — 12-15,
+     habitual en rangos altos — el número se quedaba con 0px de ancho
+     real, comprimido a la nada entre los dos botones ±; medido, no
+     estimado). Columnas fijas (#, ✓, ×) también apretadas un poco para
+     ceder más espacio a KG/REPS — sus glifos no lo necesitan. */
+  grid-template-columns: 26px minmax(0,2.7fr) minmax(0,2.3fr) minmax(0,0.8fr) 46px 20px;
   gap: 6px; align-items: center;
 }
 /* === Modo UNILATERAL ESTRICTO (sub-filas I/D apiladas) ===
@@ -370,13 +378,21 @@ body.aw-open .rest-panel { display: none !important; }
   gap: 0;
   background: var(--neutral-bg); border: 1px solid transparent;
   border-radius: 8px;
-  padding: 2px 5px;                              /* 5px lateral = respiración del "+" */
+  padding: 2px 3px;                              /* 3px lateral: el resto del margen
+                                                     se cede al número (auditoría:
+                                                     con 26px de botón + 5px de
+                                                     padding, reps de 2 dígitos
+                                                     (12-15) se quedaban con 0px
+                                                     reales — medido, no estimado) */
   min-height: 44px;
 }
 .aw-set.next .aw-stepper { border-color: var(--accent); }
 .aw-stepper .aw-step {
-  flex: 0 0 26px;                                /* cuadrado fijo, no crece ni encoge */
-  min-width: 26px; min-height: 26px;
+  flex: 0 0 22px;                                /* cuadrado fijo, no crece ni encoge.
+                                                     Sigue siendo un tap target cómodo:
+                                                     align-items:stretch lo estira a
+                                                     los 44px de alto del stepper. */
+  min-width: 22px; min-height: 22px;
   background: transparent; border: 0; color: var(--accent-2);
   font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer;
   border-radius: 6px;

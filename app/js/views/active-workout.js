@@ -538,11 +538,7 @@ function buildPage(item, pageIdx) {
 
   const head = h('div', { class: 'aw-ex-head' },
     h('div', { class: 'aw-ex-titles' },
-      h('div', { class: 'aw-ex-name-row' },
-        h('div', { class: 'aw-ex-name' }, ex.name),
-        tipsBtn,
-        settingsBtn,
-      ),
+      h('div', { class: 'aw-ex-name' }, ex.name),
       h('div', { class: 'aw-ex-meta' },
         `${escapeH(ex.group)} · ${item.sets}×${_exRange} · descanso ${fmtMMSS(restSec)}`),
       ...(goalChip ? [goalChip] : []),
@@ -554,6 +550,9 @@ function buildPage(item, pageIdx) {
             lastValueEl,
           )
         : h('span', { class: 'aw-last-cap' }, 'sin registros'),
+      // TIPS + ⚙ bajo el chip ÚLTIMA (auditoría: antes vivían junto al
+      // nombre y lo forzaban a truncarse en "Elevación de g…").
+      h('div', { class: 'aw-ex-actions' }, tipsBtn, settingsBtn),
     ),
   );
 
