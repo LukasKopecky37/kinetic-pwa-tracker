@@ -569,6 +569,15 @@ point):
 - **v72** — Double-progression auto-fill (row jumps to the new weight +
   min reps when the engine's decision is genuinely UP/DOWN) + weight-pill
   digit-overflow fix (grid rebalance + `.dig5` tier)
+- **v73** — Fixed `suggestionFor()` in `home.js` (Level-1 "Hoy" banner +
+  Level-2 day list): when today isn't a scheduled weekday for ANY día, the
+  "next suggested" day must be whichever día has gone LONGEST without
+  training (continues the rotation forward — Lun→Mar→Jue→Vie). A branch
+  that echoed back `Store.getLastRoutine()` (the last día merely OPENED,
+  not the most overdue one) used to win first and made the app re-suggest
+  a día already trained instead of advancing — reproduced with the exact
+  reported scenario (today=Wed, no día scheduled that day) before and
+  after the fix, in both the banner and the day-list badge.
 
 ---
 

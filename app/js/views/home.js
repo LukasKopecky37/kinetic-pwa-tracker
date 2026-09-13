@@ -80,10 +80,15 @@ export function renderHome() {
 function suggestionFor(days, todayDow) {
   const todayDay = days.find(d => (d.days || []).includes(todayDow));
   const lastId = Store.getLastRoutine();
+  // Si hoy no es un día programado de la rutina, el siguiente sugerido es el
+  // que lleva MÁS TIEMPO sin entrenarse (continúa la rotación hacia delante:
+  // Lunes→Martes→Jueves→Viernes). Antes, si `lastId` (el último Día que se
+  // ABRIÓ, no necesariamente el más antiguo) coincidía con algún día de esta
+  // rutina, esa rama ganaba SIEMPRE y repetía el mismo día ya entrenado en
+  // vez de avanzar al que tocaba — el ranking por antigüedad de abajo (que
+  // sí es correcto) quedaba como código muerto en la práctica.
   let suggestedId = null;
-  if (!todayDay && lastId && days.some(d => d.id === lastId)) {
-    suggestedId = lastId;
-  } else if (!todayDay) {
+  if (!todayDay) {
     const ranked = days.map(d => {
       const last = Store.lastSessionForRoutine(d.id);
       return { id: d.id, since: last ? daysSince(last.date) : 9999 };
